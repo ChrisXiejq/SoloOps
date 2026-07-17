@@ -2,9 +2,9 @@
 
 ## 1. 演示目标
 
-用 8-10 分钟展示 SoloOps 不是普通 CRUD，也不是不受控的 ChatOps，而是一个具备企业级边界的 AI 运维系统：
+用 8-10 分钟展示 SoloOps 不是普通 CRUD，也不是 CloudMonitor/OOS 的替代品，而是一个具备企业级边界的 AI 运维治理系统：
 
-- 能发现真实运维风险。
+- 能接入和归并阿里云原生告警、健康事件和资源配置。
 - 能解释证据和影响。
 - 能生成受控修复计划。
 - 能通过人工审批执行。
@@ -17,7 +17,7 @@
 - Web 服务跑在 ECS 上。
 - 数据库使用 PostgreSQL/RDS。
 - 应用通过 Docker Compose 部署。
-- 最近出现容器重启和磁盘告警。
+- 最近 CloudMonitor 出现磁盘告警，SLS 里出现容器重启日志。
 - 安全组错误地把 PostgreSQL 暴露到公网。
 
 Mock 数据中对应：
@@ -32,7 +32,7 @@ Mock 数据中对应：
 
 讲解：
 
-> SoloOps 是面向小团队的 AI 运维副驾。它不是让大模型直接 SSH 到机器上执行命令，而是用证据、规则、审批和 Playbook 把运维自动化控制在安全边界内。
+> SoloOps 是面向小团队的 AI 运维治理层。它不是替代阿里云 CloudMonitor、ARMS、SLS 或 OOS，而是把这些原生告警、健康事件和执行模板治理成可解释、可审批、可验证、可审计的修复闭环。
 
 展示：
 
@@ -52,7 +52,7 @@ curl -X POST http://localhost:8000/api/v1/scans \
 
 讲解：
 
-> 当前使用 Mock Provider，真实接入时会替换为阿里云只读 Provider。扫描阶段只读取资源和指标，不具备写权限。
+> 当前使用 Mock Provider，真实接入时会读取 CloudMonitor 告警/指标、ECS 健康状态、安全组配置、SLS 摘要和 OOS 执行记录。归因阶段只读，不具备写权限。
 
 ### Step 3：查看 Findings
 
@@ -70,7 +70,7 @@ curl http://localhost:8000/api/v1/findings
 
 讲解：
 
-> 每个 Finding 都有 rule_id、severity、resource_id 和 evidence。面试时可以强调这和单纯让 LLM 猜问题不同，风险判断是可复现的。
+> 每个 Finding 都有 rule_id、severity、resource_id 和 evidence。面试时可以强调：阿里云原生系统负责发现信号，SoloOps 负责归并证据、解释风险和治理修复闭环。
 
 ### Step 4：生成修复计划
 
@@ -165,11 +165,11 @@ curl -X POST http://localhost:8000/api/v1/plans/<plan_id>/execute
 
 ### 和普通监控系统有什么区别？
 
-普通监控主要负责采集和告警；SoloOps 增加了证据化 Finding、修复计划、审批、受控执行和审计闭环。
+普通监控主要负责采集和告警；SoloOps 不重复做这件事。它消费 CloudMonitor/ARMS/SLS/ECS/OOS 的原生信号，增加证据化 Finding、修复计划、审批、受控执行和审计闭环。
 
 ### 如何接入真实阿里云？
 
-实现 `AliyunReadOnlyProvider` 读取 ECS、安全组和 CloudMonitor；写动作使用单独 ExecutionAdapter，并通过 RAM/STS 获取短时写权限。
+实现阿里云只读 Signal Provider，读取 CloudMonitor 告警/指标、ECS 健康和安全组、SLS 摘要、OOS 模板和执行记录；写动作使用单独 ExecutionAdapter，可调用已登记 OOS 模板，并通过 RAM/STS 获取短时写权限。
 
 ### 如何避免误操作？
 
@@ -197,4 +197,4 @@ docker compose up --build
 
 可写为：
 
-> SoloOps：面向独立开发者和小团队的 AI 应用运维副驾。基于 FastAPI、PostgreSQL、Redis、Docker 和阿里云 RAM/STS 设计，实现云资源证据化巡检、风险 Finding、受控 Playbook、人工审批、dry-run 执行、审计追踪和 Agent 风险解释。项目强调最小权限、状态机、可观测性和评测体系，避免 LLM 直接执行高风险命令。
+> SoloOps：面向独立开发者和小团队的 AI 运维治理层。基于 FastAPI、PostgreSQL、Redis、Docker 和阿里云 RAM/STS 设计，聚合 CloudMonitor、ECS 健康、SLS、OOS 等原生信号，将告警转化为证据化 Finding、受控 Playbook/OOS 模板、人工审批、dry-run 执行、审计追踪和 Agent 风险解释。项目强调最小权限、状态机、可观测性、评测体系和 LLM 安全边界。

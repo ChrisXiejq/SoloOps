@@ -64,6 +64,8 @@ Redis 中不保存长期业务事实。
 
 - ECS：实例、安全组、安全组规则。
 - CloudMonitor：磁盘、CPU、网络等指标。
+- OOS：模板元数据、执行记录和审批后执行后端。
+- ActionTrail：云 API 变更记录，用于归因和复盘。
 - RDS：实例、备份、备份策略。
 - OSS：Bucket ACL、生命周期和对象前缀策略。
 - RAM/STS：只读角色和审批后短时写角色。
@@ -119,7 +121,7 @@ MinIO
 | 方案 | 暂不采用原因 |
 | --- | --- |
 | Kubernetes 首发部署 | 单人开发和秋招展示成本过高 |
-| 自研监控存储 | 偏离项目核心，CloudMonitor/Prometheus 足够 |
+| 自研监控/日志/APM 平台 | 偏离项目核心，CloudMonitor/ARMS/SLS 足够 |
 | 任意 Shell Agent | 安全不可控，不适合企业级叙事 |
 | 全多云首发 | 范围过大，Provider 接口先预留 |
 | 从零训练模型 | 与项目目标无关，成本高 |

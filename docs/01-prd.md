@@ -1,22 +1,22 @@
-# PRD：SoloOps AI 应用运维副驾
+# PRD：SoloOps AI 运维治理层
 
 **版本**：v0.1  
 **状态**：开发前基线  
-**目标**：完成可演示、可部署、可审计的企业级运维 Agent MVP
+**目标**：完成可演示、可部署、可审计的企业级 AI 运维治理 MVP，聚合阿里云原生监控与自动化能力，而不是替代它们。
 
 ## 1. 用户故事
 
 ### US-01：配置工作区与云账号
 
-作为团队负责人，我希望在工作区中配置云账号、环境、资源标签和权限状态，使系统只巡检我授权的资源。
+作为团队负责人，我希望在工作区中配置云账号、环境、资源标签、CloudMonitor/ARMS/SLS/OOS 接入状态和权限状态，使系统只读取我授权的数据和资源。
 
-**验收**：用户可创建工作区；配置 Provider 为 `mock` 或 `aliyun-readonly`；系统展示权限检查结果；缺少只读权限时不可启动真实扫描。
+**验收**：用户可创建工作区；配置 Provider 为 `mock` 或 `aliyun-readonly`；系统展示 CloudMonitor、ECS、SLS、OOS 的权限检查结果；缺少只读权限时不可启动真实接入。
 
-### US-02：执行证据化巡检
+### US-02：归并原生告警和证据
 
-作为运维负责人，我希望一键扫描云资源和运行状态，得到带证据的风险清单。
+作为运维负责人，我希望系统把 CloudMonitor 告警、ECS 健康状态、SLS 日志摘要、资源配置和部署上下文归并成带证据的风险清单。
 
-**验收**：扫描任务返回 `scan_id`；每个 Finding 包含规则 ID、严重级别、资源 ID、描述、证据来源、观测时间和建议动作。
+**验收**：归因任务返回 `scan_id`；每个 Finding 包含规则 ID、严重级别、资源 ID、原始信号来源、描述、证据、观测时间和建议动作。
 
 ### US-03：查看风险解释
 
@@ -44,14 +44,14 @@
 
 ## 2. 核心流程
 
-1. 用户创建工作区并配置云 Provider。
-2. 系统执行权限预检，确认只读角色可用。
-3. 用户触发扫描，Worker 拉取资源、指标、配置和运行状态。
-4. Rule Engine 生成 Finding，并保存证据快照。
+1. 用户创建工作区并配置云 Provider、CloudMonitor/ARMS/SLS/OOS 连接和只读权限。
+2. 系统执行权限预检，确认只读角色可读取原生告警、健康事件、资源配置和执行记录。
+3. 用户触发归因任务，Worker 拉取原生信号、资源、指标、配置、部署状态和运行摘要。
+4. Rule Engine / Correlator 生成 Finding，并保存证据快照。
 5. 用户查看 Finding 详情，选择生成修复计划。
 6. Planner 根据白名单 Playbook 生成计划。
 7. 审批人批准或拒绝计划。
-8. Executor 使用短时写角色执行受控动作，或在本地 dry run。
+8. Executor 使用短时写角色执行受控动作，或调用已登记的 OOS 模板，或在本地 dry run。
 9. Verifier 重新读取资源和指标，判断修复是否生效。
 10. Audit Service 固化全链路记录。
 
@@ -65,22 +65,32 @@
 - Operator 可扫描和创建计划，不可审批自己的高风险计划。
 - Approver 可审批和拒绝计划，不直接修改执行参数。
 
-### 3.2 Provider 接入
+### 3.2 原生信号与 Provider 接入
 
 - MVP 默认支持 `MockCloudProvider`，保证离线演示。
-- 阿里云 Provider 分为只读 Provider 和写执行 Adapter。
-- Provider 接口必须区分读取资源、读取指标、读取配置和执行动作。
+- 阿里云 Provider 分为只读 Signal/Resource Provider 和写执行 Adapter。
+- Provider 接口必须区分读取告警、读取健康事件、读取资源、读取指标、读取配置、读取 OOS 执行记录和执行动作。
 - Provider 错误需要归一化为可展示的连接、权限、限流、资源不存在等类型。
 
-### 3.3 扫描与规则
+首批接入优先级：
+
+| 来源 | 用途 |
+| --- | --- |
+| CloudMonitor | 指标、告警、实体健康信号 |
+| ECS | 实例状态、安全组、资源标签 |
+| SLS | 脱敏日志摘要和错误模式 |
+| OOS | 已登记模板、执行结果和执行记录 |
+| ActionTrail | 变更审计和最近人工操作 |
+
+### 3.3 归因与规则
 
 首批规则：
 
 | 规则 ID | 类型 | 严重级别 | 说明 |
 | --- | --- | --- | --- |
 | SG-001 | 安全 | Critical | PostgreSQL 5432 对公网开放 |
-| ECS-001 | 可靠性 | High | 实例磁盘使用率超过阈值 |
-| ECS-002 | 可靠性 | High | 容器重启次数异常 |
+| ECS-001 | 可靠性 | High | CloudMonitor 磁盘告警或实例磁盘使用率超过阈值 |
+| ECS-002 | 可靠性 | High | 容器重启次数异常或 SLS/ARMS 出现重启模式 |
 | RDS-001 | 可靠性 | High | 最近备份过期或不存在 |
 | OSS-001 | 安全 | High | Bucket 公共读写风险 |
 | TLS-001 | 可用性 | Medium | 证书即将过期 |
@@ -96,7 +106,7 @@
 ### 3.5 修复计划与 Playbook
 
 - 修复计划由确定性 Playbook 生成，LLM 只能补充解释和风险提示。
-- 每个 Playbook 定义输入 Schema、权限、执行步骤、验证步骤和回滚步骤。
+- 每个 Playbook 定义输入 Schema、权限、执行步骤、验证步骤和回滚步骤；可选择调用 OOS 模板作为执行后端。
 - 首批 Playbook：
   - `revoke_public_postgres_rule`：撤销精确匹配的公网 PostgreSQL 安全组规则。
   - `collect_disk_diagnosis`：采集磁盘占用证据，不修改资源。
@@ -141,6 +151,7 @@
 
 - 不实现通用远程命令执行平台。
 - 不让模型生成未校验的云 API 参数并直接执行。
+- 不替代 CloudMonitor、ARMS、SLS、ECS 健康检查或 OOS。
 - 不在 MVP 中追求复杂 Kubernetes 集群运维。
 - 不支持绕过云平台 IAM、审计和风控。
 - 不把“建议”伪装成“已验证事实”。

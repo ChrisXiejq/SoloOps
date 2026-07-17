@@ -27,13 +27,13 @@ erDiagram
 | `memberships` | tenant_id, user_id, role | 成员和角色 |
 | `provider_connections` | id, tenant_id, provider, region, status, config_json | 云连接配置，不保存明文密钥 |
 | `resources` | id, tenant_id, provider, resource_type, external_id, name, region, tags_json, last_seen_at | 云资源快照索引 |
-| `scans` | id, tenant_id, provider, status, started_at, completed_at, error_json | 扫描任务 |
+| `scans` | id, tenant_id, provider, status, started_at, completed_at, error_message | 扫描任务 |
 | `observations` | id, scan_id, resource_id, source, observed_at, summary, payload_json | 指标、配置和运行证据 |
 | `findings` | id, tenant_id, scan_id, resource_id, rule_id, title, severity, status, evidence_refs_json | 风险项 |
 | `remediation_plans` | id, finding_id, playbook_id, action, target_resource_id, rationale, expected_impact, rollback_json, status | 修复计划 |
 | `approvals` | id, plan_id, approver_id, decision, comment, decided_at | 审批记录 |
 | `executions` | id, plan_id, status, idempotency_key, started_at, completed_at, verification_json | 执行记录 |
-| `audit_events` | id, tenant_id, actor_id, entity_type, entity_id, action, payload_json, created_at | 不可变审计事件 |
+| `audit_events` | id, tenant_id, actor, entity_type, entity_id, event_type, message, payload_json, created_at | 不可变审计事件 |
 | `agent_runs` | id, tenant_id, finding_id, trace_id, agent_type, model, input_refs_json, output_json, cost, status | Agent Trace |
 
 所有表使用 UUID 主键；所有租户内查询必须带 `tenant_id`；`audit_events` 和 `approvals` 原则上不做物理删除。
@@ -42,7 +42,9 @@ erDiagram
 
 ### ScanStatus
 
-`PENDING / RUNNING / SUCCEEDED / FAILED / CANCELED`
+当前实现：`pending / running / succeeded / failed`
+
+规划扩展：`canceled`
 
 ### FindingStatus
 
@@ -71,6 +73,7 @@ erDiagram
 | --- | --- | --- |
 | GET | `/healthz` | 健康检查 |
 | POST | `/api/v1/scans` | 创建扫描任务 |
+| GET | `/api/v1/scans` | 查询扫描列表 |
 | GET | `/api/v1/scans/{scan_id}` | 查询扫描状态和摘要 |
 | GET | `/api/v1/findings` | 查询 Finding 列表 |
 | GET | `/api/v1/findings/{finding_id}` | 查询 Finding 详情 |
@@ -100,16 +103,32 @@ POST /api/v1/scans
 }
 ```
 
+当前实现支持的 `provider`：
+
+- `mock`：本地固定数据，适合测试和演示。
+- `aliyun`：读取 `.env` 中配置的阿里云 ECS、安全组、CloudMonitor 指标和 ECS 健康状态。
+
 响应：
 
 ```json
 {
   "id": "scan_01",
   "provider": "mock",
-  "status": "RUNNING",
-  "started_at": "2026-07-16T10:00:00Z"
+  "status": "pending",
+  "started_at": "2026-07-16T10:00:00Z",
+  "completed_at": "2026-07-16T10:00:00Z",
+  "findings": [],
+  "error_message": null
 }
 ```
+
+后台 Worker 会继续推进状态：
+
+```text
+pending -> running -> succeeded / failed
+```
+
+客户端通过 `GET /api/v1/scans/{scan_id}` 轮询结果。
 
 ### Finding 详情
 

@@ -7,17 +7,24 @@ from sqlalchemy.orm import sessionmaker
 
 from .db import (
     ApprovalRecord,
+    AuditEventRecord,
     ExecutionRecord,
     FindingRecord,
     RemediationPlanRecord,
     ScanRecord,
     create_session_factory,
 )
-from .domain import Approval, Execution, Finding, RemediationPlan, ScanResult
+from .domain import Approval, AuditEvent, Execution, Finding, RemediationPlan, ScanResult
 
 
 class Store(Protocol):
     def save_scan(self, scan: ScanResult) -> None: ...
+
+    def update_scan(self, scan: ScanResult) -> None: ...
+
+    def list_scans(self) -> list[ScanResult]: ...
+
+    def get_scan(self, scan_id: str) -> ScanResult | None: ...
 
     def list_findings(self) -> list[Finding]: ...
 
@@ -35,6 +42,12 @@ class Store(Protocol):
 
     def save_execution(self, execution: Execution) -> None: ...
 
+    def get_execution(self, execution_id: str) -> Execution | None: ...
+
+    def save_audit_event(self, event: AuditEvent) -> None: ...
+
+    def list_audit_events(self) -> list[AuditEvent]: ...
+
     def clear(self) -> None: ...
 
 
@@ -47,10 +60,20 @@ class MemoryStore:
         self.plans: dict[str, RemediationPlan] = {}
         self.approvals: dict[str, Approval] = {}
         self.executions: dict[str, Execution] = {}
+        self.audit_events: dict[str, AuditEvent] = {}
 
     def save_scan(self, scan: ScanResult) -> None:
         self.scans[scan.id] = scan
         self.findings.update({finding.id: finding for finding in scan.findings})
+
+    def update_scan(self, scan: ScanResult) -> None:
+        self.save_scan(scan)
+
+    def list_scans(self) -> list[ScanResult]:
+        return list(self.scans.values())
+
+    def get_scan(self, scan_id: str) -> ScanResult | None:
+        return self.scans.get(scan_id)
 
     def list_findings(self) -> list[Finding]:
         return list(self.findings.values())
@@ -76,12 +99,22 @@ class MemoryStore:
     def save_execution(self, execution: Execution) -> None:
         self.executions[execution.id] = execution
 
+    def get_execution(self, execution_id: str) -> Execution | None:
+        return self.executions.get(execution_id)
+
+    def save_audit_event(self, event: AuditEvent) -> None:
+        self.audit_events[event.id] = event
+
+    def list_audit_events(self) -> list[AuditEvent]:
+        return sorted(self.audit_events.values(), key=lambda event: event.created_at, reverse=True)
+
     def clear(self) -> None:
         self.scans.clear()
         self.findings.clear()
         self.plans.clear()
         self.approvals.clear()
         self.executions.clear()
+        self.audit_events.clear()
 
 
 class SQLAlchemyStore:
@@ -99,11 +132,26 @@ class SQLAlchemyStore:
             session.merge(ScanRecord(
                 id=scan.id,
                 provider=scan.provider,
+                status=scan.status.value,
                 started_at=scan.started_at,
                 completed_at=scan.completed_at,
+                error_message=scan.error_message,
             ))
             for finding in scan.findings:
                 session.merge(self._finding_to_record(finding, scan.id))
+
+    def update_scan(self, scan: ScanResult) -> None:
+        self.save_scan(scan)
+
+    def list_scans(self) -> list[ScanResult]:
+        with self.session_factory() as session:
+            records = session.scalars(select(ScanRecord).order_by(ScanRecord.started_at.desc())).all()
+            return [self._record_to_scan(record) for record in records]
+
+    def get_scan(self, scan_id: str) -> ScanResult | None:
+        with self.session_factory() as session:
+            record = session.get(ScanRecord, scan_id)
+            return self._record_to_scan(record) if record else None
 
     def list_findings(self) -> list[Finding]:
         with self.session_factory() as session:
@@ -126,6 +174,7 @@ class SQLAlchemyStore:
             session.merge(RemediationPlanRecord(
                 id=plan.id,
                 finding_id=plan.finding_id,
+                playbook_id=plan.playbook_id,
                 action=plan.action,
                 target=plan.target,
                 rationale=plan.rationale,
@@ -143,6 +192,7 @@ class SQLAlchemyStore:
             return RemediationPlan(
                 id=record.id,
                 finding_id=record.finding_id,
+                playbook_id=record.playbook_id,
                 action=record.action,
                 target=record.target,
                 rationale=record.rationale,
@@ -177,9 +227,48 @@ class SQLAlchemyStore:
                 created_at=execution.created_at,
             ))
 
+    def get_execution(self, execution_id: str) -> Execution | None:
+        with self.session_factory() as session:
+            record = session.get(ExecutionRecord, execution_id)
+            if not record:
+                return None
+            return Execution(
+                id=record.id,
+                plan_id=record.plan_id,
+                status=record.status,
+                verification=record.verification,
+                audit=record.audit,
+                created_at=record.created_at,
+            )
+
+    def save_audit_event(self, event: AuditEvent) -> None:
+        with self.session_factory.begin() as session:
+            session.merge(AuditEventRecord(
+                id=event.id,
+                event_type=event.event_type,
+                actor=event.actor,
+                entity_type=event.entity_type,
+                entity_id=event.entity_id,
+                message=event.message,
+                payload=event.payload,
+                created_at=event.created_at,
+            ))
+
+    def list_audit_events(self) -> list[AuditEvent]:
+        with self.session_factory() as session:
+            records = session.scalars(select(AuditEventRecord).order_by(AuditEventRecord.created_at.desc())).all()
+            return [self._record_to_audit_event(record) for record in records]
+
     def clear(self) -> None:
         with self.session_factory.begin() as session:
-            for record in (ExecutionRecord, ApprovalRecord, RemediationPlanRecord, FindingRecord, ScanRecord):
+            for record in (
+                AuditEventRecord,
+                ExecutionRecord,
+                ApprovalRecord,
+                RemediationPlanRecord,
+                FindingRecord,
+                ScanRecord,
+            ):
                 session.query(record).delete()
 
     @staticmethod
@@ -212,5 +301,33 @@ class SQLAlchemyStore:
             remediation_action=record.remediation_action,
             rollback_action=record.rollback_action,
             status=record.status,
+            created_at=record.created_at,
+        )
+
+    def _record_to_scan(self, record: ScanRecord) -> ScanResult:
+        with self.session_factory() as session:
+            finding_records = session.scalars(
+                select(FindingRecord).where(FindingRecord.scan_id == record.id).order_by(FindingRecord.created_at)
+            ).all()
+            return ScanResult(
+                id=record.id,
+                provider=record.provider,
+                status=record.status,
+                started_at=record.started_at,
+                completed_at=record.completed_at,
+                error_message=record.error_message,
+                findings=[self._record_to_finding(finding_record) for finding_record in finding_records],
+            )
+
+    @staticmethod
+    def _record_to_audit_event(record: AuditEventRecord) -> AuditEvent:
+        return AuditEvent(
+            id=record.id,
+            event_type=record.event_type,
+            actor=record.actor,
+            entity_type=record.entity_type,
+            entity_id=record.entity_id,
+            message=record.message,
+            payload=record.payload,
             created_at=record.created_at,
         )

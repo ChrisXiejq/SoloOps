@@ -6,13 +6,14 @@
 flowchart LR
   UI["Web/UI（后续）"] --> API["FastAPI API"]
   API --> S["SoloOps Service"]
-  S --> SC["Scanner + Rules"]
-  SC --> P["CloudProvider Port"]
+  S --> SC["Evidence Collector + Rules"]
+  SC --> SIG["Native Signal Providers\nCloudMonitor / SLS / OOS"]
+  SC --> P["Resource Provider Port"]
   P --> M["Mock Provider（当前）"]
-  P -. 仅只读 STS .-> ALI["阿里云 ECS/CMS/RDS/OSS"]
+  P -. 仅只读 STS .-> ALI["阿里云 ECS/CMS/RDS/OSS/OOS"]
   S --> AP["Approval Gate"]
   AP --> EX["Allowlisted Executor"]
-  EX -. 审批后短时写角色 .-> ALI
+  EX -. 审批后短时写角色或已登记 OOS 模板 .-> ALI
 ```
 
 ## 数据演进
@@ -32,7 +33,7 @@ flowchart LR
 ### Phase 1：可信只读 MVP（当前，1–2 周）
 
 - 完成 Mock API、规则、审批、测试和 Docker Compose。
-- 实现真实 ECS `DescribeInstances`、安全组读取和 CloudMonitor 指标读取。
+- 实现真实 CloudMonitor 告警/指标、ECS 健康状态、安全组读取和 OOS 执行记录读取。
 - 首批规则：公网数据库端口、磁盘、容器重启、证书到期、备份过期。
 
 ### Phase 2：受控变更（2–3 周）
@@ -44,7 +45,7 @@ flowchart LR
 ### Phase 3：应用运维 Agent（3–4 周）
 
 - 接入 Docker/Compose 清单、部署版本、OTel/SLS 日志。
-- 资源—服务—部署版本—告警的证据图谱。
+- CloudMonitor/ARMS/SLS/OOS 信号—资源—服务—部署版本—告警的证据图谱。
 - 成本归因、异常检测、变更风险评分与故障注入评测。
 
 ## 部署

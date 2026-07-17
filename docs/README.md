@@ -19,9 +19,11 @@
 | [10-demo-story.md](10-demo-story.md) | 秋招演示脚本、讲解重点和简历描述 |
 | [11-deployment-runbook.md](11-deployment-runbook.md) | 本地、生产部署、发布检查、回滚和故障处理 |
 | [12-resource-and-cost-plan.md](12-resource-and-cost-plan.md) | Conda 环境、阿里云资源、模型资源和成本规划 |
+| [13-native-cloud-governance-positioning.md](13-native-cloud-governance-positioning.md) | SoloOps 与阿里云 CloudMonitor/ARMS/SLS/OOS 的关系和定位 |
 
 ## 开发前必须冻结的决策
 
+- SoloOps 是阿里云原生可观测与 OOS 之上的治理层，不替代 CloudMonitor/ARMS/SLS/OOS。
 - SoloOps 默认只读，不做任意 SSH/Shell。
 - 规则引擎生成 Finding，LLM 只做解释和辅助计划。
 - 写动作必须来自 Playbook Registry。

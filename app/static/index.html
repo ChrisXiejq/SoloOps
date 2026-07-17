@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SoloOps Console</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f7f8fb;
+        color: #172033;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      header {
+        background: #111827;
+        color: white;
+        padding: 24px 32px;
+      }
+
+      header p {
+        color: #cbd5e1;
+        margin: 8px 0 0;
+        max-width: 960px;
+      }
+
+      main {
+        display: grid;
+        gap: 20px;
+        grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
+        padding: 24px 32px;
+      }
+
+      .card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        padding: 20px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+        font-weight: 650;
+        padding: 10px 14px;
+      }
+
+      button.secondary {
+        background: #475569;
+      }
+
+      button:disabled {
+        background: #94a3b8;
+        cursor: wait;
+      }
+
+      .finding {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        cursor: pointer;
+        margin-top: 12px;
+        padding: 14px;
+      }
+
+      .finding:hover {
+        border-color: #2563eb;
+      }
+
+      .meta {
+        color: #64748b;
+        font-size: 13px;
+      }
+
+      .badge {
+        border-radius: 999px;
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 8px;
+      }
+
+      .critical {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      .high {
+        background: #ffedd5;
+        color: #9a3412;
+      }
+
+      pre {
+        background: #0f172a;
+        border-radius: 12px;
+        color: #e2e8f0;
+        overflow: auto;
+        padding: 14px;
+        white-space: pre-wrap;
+      }
+
+      .audit-event {
+        border-left: 3px solid #2563eb;
+        margin-top: 12px;
+        padding-left: 12px;
+      }
+
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>SoloOps Console</h1>
+      <p>
+        AI governance layer for native cloud alerts, evidence, approval-gated plans,
+        and controlled remediation. The current build supports mock signals and read-only Aliyun signals.
+      </p>
+    </header>
+    <main>
+      <section class="card">
+        <h2>Findings</h2>
+        <p class="meta">Mock source: CloudMonitor-like alarms, SLS-like log patterns, OOS-like execution records, and resource snapshots.</p>
+        <div class="toolbar">
+          <button id="runScan">Run Mock Correlation</button>
+          <button class="secondary" id="loadAliyunSignals">Load Aliyun Signals</button>
+          <button class="secondary" id="refresh">Refresh</button>
+        </div>
+        <div id="findings"></div>
+      </section>
+      <section class="card">
+        <h2>Details</h2>
+        <div id="details" class="meta">Select a finding to inspect evidence and create a remediation plan.</div>
+      </section>
+      <section class="card">
+        <h2>Audit Events</h2>
+        <div id="auditEvents" class="meta">No audit events loaded.</div>
+      </section>
+      <section class="card">
+        <h2>Native Signals</h2>
+        <div id="nativeSignals" class="meta">Click Load Aliyun Signals to read CloudMonitor, ECS, OOS and ActionTrail.</div>
+      </section>
+    </main>
+
+    <script>
+      const runScan = document.querySelector("#runScan");
+      const loadAliyunSignals = document.querySelector("#loadAliyunSignals");
+      const refresh = document.querySelector("#refresh");
+      const findings = document.querySelector("#findings");
+      const details = document.querySelector("#details");
+      const auditEvents = document.querySelector("#auditEvents");
+      const nativeSignals = document.querySelector("#nativeSignals");
+
+      async function request(path, options = {}) {
+        const response = await fetch(path, {
+          headers: {"Content-Type": "application/json"},
+          ...options,
+        });
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+        return response.json();
+      }
+
+      function badge(severity) {
+        const cls = severity === "critical" ? "critical" : "high";
+        return `<span class="badge ${cls}">${severity.toUpperCase()}</span>`;
+      }
+
+      async function loadFindings() {
+        const data = await request("/api/v1/findings");
+        findings.innerHTML = data.length
+          ? data.map((item) => `
+              <div class="finding" data-id="${item.id}">
+                <div>${badge(item.severity)} <strong>${item.title}</strong></div>
+                <div class="meta">${item.rule_id} · ${item.resource_id} · ${item.status}</div>
+                <p>${item.description}</p>
+              </div>
+            `).join("")
+          : `<p class="meta">No findings yet. Run mock correlation first.</p>`;
+
+        document.querySelectorAll(".finding").forEach((node) => {
+          node.addEventListener("click", () => loadFinding(node.dataset.id));
+        });
+      }
+
+      async function loadFinding(id) {
+        const item = await request(`/api/v1/findings/${id}`);
+        details.innerHTML = `
+          <h3>${item.title}</h3>
+          <p>${badge(item.severity)} <span class="meta">${item.rule_id} · ${item.resource_id}</span></p>
+          <p>${item.description}</p>
+          <p><strong>Recommended action:</strong> ${item.remediation_action}</p>
+          <button id="createPlan">Create Plan</button>
+          <h4>Evidence</h4>
+          <pre>${JSON.stringify(item.evidence, null, 2)}</pre>
+        `;
+        document.querySelector("#createPlan").addEventListener("click", async () => {
+          const plan = await request(`/api/v1/findings/${id}/plans`, {method: "POST"});
+          details.innerHTML += `<h4>Plan</h4><pre>${JSON.stringify(plan, null, 2)}</pre>`;
+          await loadFindings();
+          await loadAuditEvents();
+        });
+      }
+
+      async function loadAuditEvents() {
+        const data = await request("/api/v1/audit-events");
+        auditEvents.innerHTML = data.length
+          ? data.slice(0, 20).map((event) => `
+              <div class="audit-event">
+                <strong>${event.event_type}</strong>
+                <div class="meta">${event.entity_type}:${event.entity_id} · ${event.actor} · ${new Date(event.created_at).toLocaleString()}</div>
+                <div>${event.message}</div>
+              </div>
+            `).join("")
+          : `<p class="meta">No audit events yet.</p>`;
+      }
+
+      async function loadNativeSignals(provider = "aliyun") {
+        const data = await request(`/api/v1/native-signals?provider=${provider}`);
+        nativeSignals.innerHTML = data.length
+          ? `<pre>${JSON.stringify(data, null, 2)}</pre>`
+          : `<p class="meta">No native signals returned for ${provider}.</p>`;
+      }
+
+      async function pollScan(scanId) {
+        for (let attempt = 0; attempt < 60; attempt += 1) {
+          const scan = await request(`/api/v1/scans/${scanId}`);
+          details.innerHTML = `<p>Scan ${scan.id} status: <strong>${scan.status}</strong>. Findings: ${scan.findings.length}.</p>`;
+          await loadAuditEvents();
+          if (scan.status === "succeeded" || scan.status === "failed") {
+            return scan;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+        throw new Error(`Scan ${scanId} did not finish before polling timed out`);
+      }
+
+      runScan.addEventListener("click", async () => {
+        runScan.disabled = true;
+        try {
+          const requested = await request("/api/v1/scans", {
+            method: "POST",
+            body: JSON.stringify({provider: "mock"}),
+          });
+          details.innerHTML = `<p>Scan ${requested.id} queued with status ${requested.status}. Polling...</p>`;
+          const scan = await pollScan(requested.id);
+          details.innerHTML = `<p>Scan ${scan.id} finished with status ${scan.status} and ${scan.findings.length} findings.</p>`;
+          await loadFindings();
+          await loadAuditEvents();
+        } finally {
+          runScan.disabled = false;
+        }
+      });
+      loadAliyunSignals.addEventListener("click", async () => {
+        loadAliyunSignals.disabled = true;
+        try {
+          await loadNativeSignals("aliyun");
+        } finally {
+          loadAliyunSignals.disabled = false;
+        }
+      });
+      refresh.addEventListener("click", async () => {
+        await loadFindings();
+        await loadAuditEvents();
+      });
+      loadFindings();
+      loadAuditEvents();
+    </script>
+  </body>
+</html>

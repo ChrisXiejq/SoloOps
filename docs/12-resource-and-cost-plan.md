@@ -60,6 +60,9 @@ conda activate soloops
 | 缓存/队列 | Tair/Redis | 可选 | 先用 ECS 内 Docker Redis；准生产再买 Tair 1GB | 0 到中 |
 | 对象存储 | OSS | 推荐 | 私有 Bucket，少量诊断包和导出报告 | 很低 |
 | 日志服务 | SLS | 推荐 | 小规格日志 Project，短保留周期 7-15 天 | 低 |
+| 运维编排 | OOS | 推荐 | 先只读模板和执行记录，后续审批后执行模板 | OOS 本身通常低，资源另计 |
+| 操作审计 | ActionTrail | 推荐 | 读取云 API 变更记录，用于归因和复盘 | 低 |
+| 应用监控 | ARMS | 可选 | 后续接入应用错误、链路和告警 | 视数据量 |
 | 镜像仓库 | ACR | 可选 | 个人版/基础命名空间即可 | 低或 0 |
 | 域名 | 阿里云域名 | 可选 | 已有域名则复用；没有可暂用 ECS IP | 低 |
 | HTTPS 证书 | 数字证书管理服务 | 推荐 | 免费 DV 证书或 Let's Encrypt | 0 到低 |
@@ -80,17 +83,20 @@ conda activate soloops
 - VPC、交换机、安全组。
 - ECS 实例，用于部署 SoloOps API/Web/Worker。
 - RAM 角色：
-  - `soloops-read-role`：只读巡检。
+  - `soloops-read-role`：只读读取原生信号、资源配置和执行记录。
   - `soloops-write-role`：审批后短时写动作。
   - `soloops-deploy-role`：部署拉镜像和更新服务。
 - CloudMonitor API 访问权限。
+- OOS 只读权限：读取模板、执行详情和执行记录。
+- ActionTrail 只读权限：读取近期云 API 变更事件。
 - ECS 安全组只开放 80/443；SSH 只允许你的固定 IP。
 
 ### 5.2 推荐配置
 
 - RDS PostgreSQL：保存资源快照、Finding、审批、审计。
 - OSS 私有 Bucket：保存诊断包、导出报告、脱敏日志引用。
-- SLS Project：收集应用日志、执行日志和告警。
+- SLS Project：收集应用日志、执行日志和告警；SoloOps 只读取脱敏摘要。
+- OOS：登记可被 SoloOps 调用的低风险模板。
 - ACR：保存 Docker 镜像。
 - HTTPS 证书和 DNS 解析。
 
@@ -103,21 +109,24 @@ conda activate soloops
 
 ## 6. 模型资源
 
-你主要使用 DeepSeek 和 MiniMax，建议按供应商分层：
+当前默认模型底座使用阿里云百炼 Qwen；DeepSeek 和 MiniMax 可作为后续备选供应商。
 
 | 用途 | 推荐模型 | 原因 |
 | --- | --- | --- |
-| 风险解释、摘要、复盘 | DeepSeek Chat | 成本相对友好，适合文本推理和解释 |
-| 复杂推理、根因分析 | DeepSeek Reasoner 或同类推理模型 | 用在少量高价值任务，避免全量调用 |
+| 风险解释、摘要、审批说明 | 阿里云百炼 Qwen Plus | 与阿里云生态一致，适合中文运维解释和低成本调用 |
+| 复杂推理、根因分析 | Qwen Max / DeepSeek Reasoner | 用在少量高价值任务，避免全量调用 |
 | 多模态或语音扩展 | MiniMax | 后续如果做语音告警、会议复盘、运维助手可用 |
 | 本地/测试 | MockLLM | CI 和本地开发不消耗模型额度 |
 
 需要申请：
 
-- DeepSeek API Key。
-- MiniMax API Key。
+- 阿里云百炼 API Key。
+- DeepSeek API Key 和 MiniMax API Key 可后置。
 - 模型调用月预算，建议先设低额度。
 - 服务端环境变量，不要写入代码或 Git：
+  - `ALIBABA_CLOUD_BAILIAN_API_KEY`
+  - `SOLOOPS_MODEL_PROVIDER`
+  - `SOLOOPS_MODEL_NAME`
   - `DEEPSEEK_API_KEY`
   - `MINIMAX_API_KEY`
   - `MODEL_GATEWAY_PROVIDER`
@@ -156,12 +165,13 @@ conda activate soloops
 ## 8. 建议采购顺序
 
 1. 暂不购买云资源，先完成本地 Docker Compose、PostgreSQL Repository 和 Web Console。
-2. 开通 DeepSeek/MiniMax API，但设置低预算，先接 MockLLM。
+2. 开通阿里云百炼 API，但设置低预算，先接 MockLLM。
 3. 购买或使用已有 ECS，部署 API/Web/Worker。
 4. 购买 RDS PostgreSQL 小规格，把数据库迁出 ECS。
 5. 开通 OSS 和 SLS，完善审计与诊断包。
-6. 真实接入阿里云只读 Provider。
-7. 需要长期演示时再购买 Tair、ACR、域名和 HTTPS。
+6. 真实接入阿里云原生信号 Provider：CloudMonitor、ECS 健康、安全组、OOS 执行记录。
+7. 用 ActionTrail 补齐最近变更归因。
+8. 需要长期演示时再购买 Tair、ACR、域名和 HTTPS。
 
 ## 9. 不建议现在购买
 

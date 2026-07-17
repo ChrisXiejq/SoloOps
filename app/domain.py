@@ -27,6 +27,13 @@ class FindingStatus(StrEnum):
     RESOLVED = "resolved"
 
 
+class ScanStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 class ExecutionStatus(StrEnum):
     PENDING_APPROVAL = "pending_approval"
     APPROVED = "approved"
@@ -60,14 +67,28 @@ class Finding(BaseModel):
 class ScanResult(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     provider: str
+    status: ScanStatus = ScanStatus.PENDING
     started_at: datetime = Field(default_factory=utcnow)
     completed_at: datetime = Field(default_factory=utcnow)
-    findings: list[Finding]
+    findings: list[Finding] = Field(default_factory=list)
+    error_message: str | None = None
+
+
+class AuditEvent(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    event_type: str
+    actor: str = "system"
+    entity_type: str
+    entity_id: str
+    message: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class RemediationPlan(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     finding_id: str
+    playbook_id: str
     action: str
     target: str
     rationale: str

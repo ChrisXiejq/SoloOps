@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "soloops"
 version = "0.1.0"
-description = "Evidence-first, approval-gated cloud operations agent MVP"
+description = "AI governance layer for cloud-native alerts, evidence, approvals, and controlled remediation"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1.0",
@@ -13,6 +13,7 @@ dependencies = [
   "pydantic>=2.8,<3.0",
   "sqlalchemy>=2.0,<3.0",
   "psycopg[binary]>=3.2,<4.0",
+  "python-dotenv>=1.0,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +22,10 @@ aliyun = [
   "alibabacloud-tea-openapi>=0.3.12",
   "alibabacloud-ecs20140526>=4.1.0",
   "alibabacloud-cms20190101>=1.0.0",
+  "alibabacloud-oos20190601>=3.0.0",
+  "alibabacloud-actiontrail20200706>=2.0.0",
+  "alibabacloud-rds20140815>=15.0.0",
+  "oss2>=2.18.0",
 ]
 
 [tool.pytest.ini_options]

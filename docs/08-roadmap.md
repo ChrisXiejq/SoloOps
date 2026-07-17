@@ -2,7 +2,7 @@
 
 ## 阶段 0：开发前冻结范围（2 天）
 
-- 确认项目定位：AI 应用运维副驾，不做任意 Shell。
+- 确认项目定位：阿里云原生可观测与 OOS 之上的 AI 运维治理层，不做任意 Shell。
 - 完成编号文档、数据模型、API 契约和安全边界。
 - 保留现有 Mock MVP 作为主链路回归基线。
 - 准备演示素材：公网数据库、磁盘不足、容器重启三个场景。
@@ -16,7 +16,7 @@
 | W3 | Web Console 基础版：Finding 列表和详情 | 能从页面触发扫描并查看证据 |
 | W4 | Remediation Plan、审批流、审计事件 | 未审批执行被拒绝；审批记录可查询 |
 | W5 | Playbook Registry、dry run Executor、Verifier | 三个 Playbook 可 dry run 并生成验证结果 |
-| W6 | 阿里云只读 Provider：ECS、安全组、CloudMonitor | 测试账号可读取真实资源并生成 Finding |
+| W6 | 阿里云原生信号接入：CloudMonitor、ECS 健康、安全组、OOS 执行记录 | 测试账号可读取真实告警/健康事件/资源配置并生成 Finding |
 | W7 | Agent 解释、Trace、Golden Set、红队安全测试 | Agent 输出结构化；评测脚本进入 CI |
 | W8 | 部署、Demo 数据、录屏脚本、README 完善 | 一键启动、本地演示、线上测试环境可访问 |
 
@@ -28,6 +28,26 @@
 | W10 | 监控告警、安全复核、压测、演示材料 | 发布检查清单通过；准备面试讲解稿 |
 
 ## 版本规划
+
+当前实现进度：
+
+- W1：已完成 SQLAlchemy Repository、本地 SQLite、数据库初始化脚本。
+- W2：已完成 Mock 原生信号归因、Scan 任务状态机、进程内后台 Worker/队列、Scan/Finding/Plan 查询接口；Redis/Celery/RQ 后续按部署需要替换。
+- W3：已完成最小 Web Console，可触发 Mock 归因、查看 Finding 列表、证据详情和审计事件；正式 React Console 后续补。
+- W4：已完成 Plan 创建、审批门禁、`audit_events` 表、执行未审批拒绝和基础审计流；后续补拒绝审批、筛选、导出和不可变审计策略。
+- W5：已完成 Playbook Registry、三个 dry-run Playbook、dry-run Executor 和 Verifier；真实 OOS/STS 执行 Adapter 后续补。
+- W6：已完成首批真实只读接入：指定 ECS 实例、安全组规则、CloudMonitor 磁盘指标、ECS 健康状态；SLS/OOS/ActionTrail/RDS/OSS 后续补。
+
+仍为 Mock/待迁移的边界：
+
+- `MockCloudProvider`：仍保留为本地回归基线；真实 `AliyunReadOnlyProvider` 已支持 ECS 实例和安全组规则读取。
+- `MockNativeSignalProvider`：仍保留为本地回归基线；真实 `AliyunNativeSignalProvider` 已支持 CloudMonitor 磁盘指标和 ECS 健康状态。
+- RDS/OSS：当前未进入规则引擎，后续增加资源快照表和规则后接入。
+- SLS/OOS/ActionTrail：当前未接 SDK，后续分别用于日志模式、执行记录和最近变更归因。
+- `InProcessScanQueue`：当前适合本地演示，生产可替换为 Redis + RQ/Celery 或云上消息队列。
+- `DryRunExecutor`：当前不改云资源，真实执行需要接入 STS 短时写角色和 OOS 模板 Adapter。
+- `Verifier`：当前为 dry-run 验证，真实验证需要重新读取 CloudMonitor/ECS/SLS/OOS 证据。
+- Web Console：当前是静态 HTML 最小页面，后续可迁移到 React/TypeScript。
 
 ### v0.1：离线可信 MVP
 
@@ -43,9 +63,9 @@
 - 审计日志。
 - 状态筛选和详情页。
 
-### v0.3：真实云只读巡检
+### v0.3：阿里云原生信号接入
 
-- 阿里云 ECS、安全组和 CloudMonitor。
+- 阿里云 CloudMonitor 告警/指标、ECS 健康状态、安全组和 OOS 执行记录。
 - 权限预检。
 - Provider 错误归一化。
 - API 限流和缓存。
@@ -54,7 +74,8 @@
 
 - Playbook Registry。
 - STS 写角色。
-- 安全组撤销真实执行。
+- Playbook 与 OOS 模板映射。
+- 安全组撤销真实执行或调用已登记 OOS 模板。
 - 执行后验证和回滚计划。
 
 ### v1.0：秋招展示版
@@ -72,7 +93,7 @@
 2. 数据持久化。
 3. Web 展示风险证据。
 4. 审批和审计。
-5. 真实只读 Provider。
+5. 真实阿里云原生信号 Provider。
 6. 部署和演示。
 
 可以后置：
@@ -92,7 +113,7 @@
 | M2：数据库和审计 | 企业级数据一致性和可追踪性 |
 | M3：Web Console | 前后端协作和产品化 |
 | M4：阿里云只读 | 云原生和 IAM 最小权限 |
-| M5：受控 Playbook | 安全自动化和幂等执行 |
+| M5：受控 Playbook/OOS | 安全自动化、模板治理和幂等执行 |
 | M6：Agent + Eval | AI 工程化、评测和安全边界 |
 
 ## 范围控制规则
@@ -100,5 +121,6 @@
 - 任意新功能必须能落到 PRD 中的用户故事。
 - 涉及写操作必须先补 Playbook、权限和测试。
 - 涉及 LLM 输出必须先补 JSON Schema 和评测样例。
+- 涉及监控/告警能力时优先接入 CloudMonitor/ARMS/SLS，不自研通用监控。
 - 未完成 W1-W5 前，不启动多云和 Kubernetes。
 - 每周至少保留一个可演示版本。

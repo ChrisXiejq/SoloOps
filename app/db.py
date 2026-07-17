@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, String, create_engine
+from sqlalchemy import JSON, DateTime, String, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -17,8 +17,10 @@ class ScanRecord(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     provider: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="succeeded", index=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
 
 class FindingRecord(Base):
@@ -43,6 +45,7 @@ class RemediationPlanRecord(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     finding_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    playbook_id: Mapped[str] = mapped_column(String(100), nullable=False, default="legacy")
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     target: Mapped[str] = mapped_column(String(200), nullable=False)
     rationale: Mapped[str] = mapped_column(String(1000), nullable=False)
@@ -73,6 +76,19 @@ class ExecutionRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class AuditEventRecord(Base):
+    __tablename__ = "audit_events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    actor: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(String(1000), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+
 def normalize_database_url(database_url: str) -> str:
     if database_url.startswith("postgresql://"):
         return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
@@ -89,4 +105,28 @@ def create_session_factory(database_url: str) -> sessionmaker:
     connect_args = {"check_same_thread": False} if normalized.startswith("sqlite") else {}
     engine = create_engine(normalized, connect_args=connect_args)
     Base.metadata.create_all(engine)
+    _apply_lightweight_migrations(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def _apply_lightweight_migrations(engine) -> None:
+    """Small local migrations before Alembic is introduced."""
+
+    inspector = inspect(engine)
+    if "scans" not in inspector.get_table_names():
+        return
+    scan_columns = {column["name"] for column in inspector.get_columns("scans")}
+    if "status" not in scan_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE scans ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'succeeded'"))
+    if "error_message" not in scan_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE scans ADD COLUMN error_message VARCHAR(1000)"))
+
+    if "remediation_plans" in inspector.get_table_names():
+        plan_columns = {column["name"] for column in inspector.get_columns("remediation_plans")}
+        if "playbook_id" not in plan_columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE remediation_plans ADD COLUMN playbook_id VARCHAR(100) NOT NULL DEFAULT 'legacy'")
+                )
