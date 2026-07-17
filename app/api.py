@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 
 from fastapi import FastAPI, HTTPException
@@ -9,12 +8,19 @@ from .domain import ApprovalRequest, ScanRequest
 from .providers import MockCloudProvider
 from .scanner import Scanner
 from .service import SoloOpsService
-from .store import MemoryStore
+from .settings import get_settings
+from .store import MemoryStore, SQLAlchemyStore, Store
 
 
 @lru_cache
 def service() -> SoloOpsService:
-    return SoloOpsService(MemoryStore(), Scanner())
+    settings = get_settings()
+    store: Store
+    if settings.store_backend == "memory":
+        store = MemoryStore()
+    else:
+        store = SQLAlchemyStore(settings.database_url)
+    return SoloOpsService(store, Scanner())
 
 
 app = FastAPI(title="SoloOps", version="0.1.0", description="Approval-gated cloud operations MVP")
@@ -34,7 +40,7 @@ def run_scan(request: ScanRequest):
 
 @app.get("/api/v1/findings")
 def list_findings():
-    return list(service().store.findings.values())
+    return service().store.list_findings()
 
 
 @app.post("/api/v1/findings/{finding_id}/plans")
@@ -49,5 +55,4 @@ def approve_plan(plan_id: str, request: ApprovalRequest):
 
 @app.post("/api/v1/plans/{plan_id}/execute")
 def execute_plan(plan_id: str):
-    enabled = os.getenv("SOLOOPS_EXECUTION_ENABLED", "false").lower() == "true"
-    return service().execute(plan_id, enabled=enabled)
+    return service().execute(plan_id, enabled=get_settings().execution_enabled)

@@ -4,6 +4,7 @@ from app.api import app, service
 
 
 def reset_store() -> None:
+    service().store.clear()
     service.cache_clear()
 
 

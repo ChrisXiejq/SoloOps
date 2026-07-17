@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from .domain import Approval, Execution, ExecutionStatus, FindingStatus, RemediationPlan
 from .providers import CloudProvider
 from .scanner import Scanner
-from .store import MemoryStore
+from .store import Store
 
 
 ALLOWED_ACTIONS = {
@@ -16,7 +16,7 @@ ALLOWED_ACTIONS = {
 
 
 class SoloOpsService:
-    def __init__(self, store: MemoryStore, scanner: Scanner) -> None:
+    def __init__(self, store: Store, scanner: Scanner) -> None:
         self.store = store
         self.scanner = scanner
 
@@ -26,7 +26,7 @@ class SoloOpsService:
         return scan
 
     def create_plan(self, finding_id: str) -> RemediationPlan:
-        finding = self.store.findings.get(finding_id)
+        finding = self.store.get_finding(finding_id)
         if not finding:
             raise HTTPException(status_code=404, detail="Finding not found")
         if finding.remediation_action not in ALLOWED_ACTIONS:
@@ -37,24 +37,28 @@ class SoloOpsService:
             expected_impact=ALLOWED_ACTIONS[finding.remediation_action],
             rollback=finding.rollback_action,
         )
-        self.store.plans[plan.id] = plan
+        self.store.save_plan(plan)
         finding.status = FindingStatus.PLANNED
+        self.store.save_finding(finding)
         return plan
 
     def approve(self, plan_id: str, approver: str, comment: str | None) -> Approval:
-        plan = self.store.plans.get(plan_id)
+        plan = self.store.get_plan(plan_id)
         if not plan:
             raise HTTPException(status_code=404, detail="Plan not found")
         approval = Approval(plan_id=plan_id, approver=approver, comment=comment)
-        self.store.approvals[plan_id] = approval
-        self.store.findings[plan.finding_id].status = FindingStatus.APPROVED
+        self.store.save_approval(approval)
+        finding = self.store.get_finding(plan.finding_id)
+        if finding:
+            finding.status = FindingStatus.APPROVED
+            self.store.save_finding(finding)
         return approval
 
     def execute(self, plan_id: str, enabled: bool) -> Execution:
-        plan = self.store.plans.get(plan_id)
+        plan = self.store.get_plan(plan_id)
         if not plan:
             raise HTTPException(status_code=404, detail="Plan not found")
-        if plan_id not in self.store.approvals:
+        if not self.store.has_approval(plan_id):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Human approval is required")
         execution = Execution(plan_id=plan_id, status=ExecutionStatus.APPROVED)
         execution.audit.append("approval verified")
@@ -68,5 +72,5 @@ class SoloOpsService:
             execution.status = ExecutionStatus.FAILED
             execution.verification = "No real cloud executor is configured. Refusing to mutate resources."
             execution.audit.append("mutation refused: no configured write adapter")
-        self.store.executions[execution.id] = execution
+        self.store.save_execution(execution)
         return execution
