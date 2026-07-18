@@ -25,6 +25,7 @@ aliyun = [
   "alibabacloud-oos20190601>=3.0.0",
   "alibabacloud-actiontrail20200706>=2.0.0",
   "alibabacloud-rds20140815>=15.0.0",
+  "aliyun-log-python-sdk>=0.9.48",
   "oss2>=2.18.0",
 ]
 

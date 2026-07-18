@@ -42,6 +42,7 @@ conda activate soloops
 | --- | --- | --- | --- |
 | Python/Conda | 必须 | Python 3.11 + conda env | 0 |
 | Docker Desktop | 必须 | 本地跑 API、PostgreSQL、Redis、MinIO | 0 |
+| Node.js/npm | 必须 | React/Vite Console 开发和构建，建议 Node 20 LTS | 0 |
 | PostgreSQL | 必须 | 本地容器，后续替换 RDS | 0 |
 | Redis | 必须 | 本地容器，后续替换 Tair | 0 |
 | MinIO | 可选 | 本地模拟 OSS | 0 |
@@ -172,6 +173,19 @@ conda activate soloops
 6. 真实接入阿里云原生信号 Provider：CloudMonitor、ECS 健康、安全组、OOS 执行记录。
 7. 用 ActionTrail 补齐最近变更归因。
 8. 需要长期演示时再购买 Tair、ACR、域名和 HTTPS。
+
+## 8.1 W8 部署与演示资源
+
+W8 的资源目标是完成可访问 Demo，而不是搭建复杂生产平台。推荐优先级：
+
+1. 本地安装 Node.js 20 LTS，完成 `frontend` React Console 构建。
+2. 使用 Docker 多阶段构建验证 API + React Console 一体镜像。
+3. 使用已有 ECS 部署镜像，先开放 8000 做调试；演示前再加 Nginx 和 HTTPS。
+4. 如果要体现企业级持久化，购买或复用小规格 RDS PostgreSQL。
+5. 如果要体现真实云原生信号，补齐 OSS Bucket、SLS Project/Logstore、RDS 实例 ID。
+6. 暂缓 ACK、ALB/WAF、高规格 Tair、高规格 RDS。
+
+详细执行清单见 [w8-deployment-and-demo-plan.md](w8-deployment-and-demo-plan.md)。
 
 ## 9. 不建议现在购买
 

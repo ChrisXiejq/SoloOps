@@ -13,6 +13,8 @@
 
 ## 2. 本地启动
 
+### 2.1 API 本地启动
+
 ```bash
 cp .env.example .env
 docker compose up --build
@@ -35,6 +37,36 @@ python -m venv .venv
 pip install -e '.[dev]'
 pytest
 ```
+
+### 2.2 React Console 本地开发
+
+需要 Node.js 20 LTS。
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+另一个终端启动 API：
+
+```bash
+uvicorn app.api:app --reload
+```
+
+打开 `http://localhost:5173`。Vite 会把 `/api` 和 `/healthz` 代理到 `localhost:8000`。
+
+### 2.3 React 构建产物由 FastAPI 托管
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+uvicorn app.api:app --reload
+```
+
+打开 `http://localhost:8000`。FastAPI 会优先服务 `frontend/dist/index.html`；如果未构建，则回退到 `app/static/index.html`。
 
 ## 3. 环境变量
 
@@ -85,6 +117,8 @@ pytest
 docker build -t soloops-api:latest .
 ```
 
+Dockerfile 会先用 `node:20-alpine` 构建 React Console，再把 `frontend/dist` 复制进 Python 运行镜像。
+
 2. 推送到镜像仓库。
 3. 在 ECS 拉取镜像。
 4. 配置 `.env.production`。
@@ -108,7 +142,9 @@ curl https://<domain>/healthz
 ## 6. 发布检查清单
 
 - [ ] 镜像构建成功。
+- [ ] React Console 构建成功。
 - [ ] 单元和集成测试通过。
+- [ ] `python scripts/run_agent_eval.py` 通过。
 - [ ] 数据库迁移完成。
 - [ ] RDS 自动备份开启。
 - [ ] Redis/Tair 私网访问。

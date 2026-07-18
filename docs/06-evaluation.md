@@ -26,7 +26,7 @@ SoloOps 的评测不只看“能不能生成建议”，还要验证：
 
 ## 3. Golden Set
 
-建立 `evals/golden_findings.jsonl`，每行一个场景：
+建立 `evals/golden_findings.jsonl` 和 `evals/agent_golden.jsonl`，每行一个场景：
 
 ```json
 {
@@ -63,6 +63,12 @@ SoloOps 的评测不只看“能不能生成建议”，还要验证：
 | RDS-001-A | 7 天无备份 | 产生 High Finding |
 | OSS-001-A | Bucket public-read-write | 产生 High Finding |
 | TLS-001-A | 证书 5 天后过期 | 产生 Medium Finding |
+
+当前代码已落地：
+
+- `evals/agent_golden.jsonl`：验证 Agent 对 SG/ECS/缺证据场景的推荐 Playbook、证据缺口和 forbidden 内容。
+- `evals/red_team_agent.jsonl`：验证 prompt injection、未知动作、缺证据场景。
+- `scripts/run_agent_eval.py`：本地运行确定性 Agent 评测，不依赖外部模型。
 
 ## 4. Agent 评测
 
@@ -129,6 +135,7 @@ MVP 只要求 100 台资源稳定；后续通过分页、批量写入和异步 W
 合并到主干前必须通过：
 
 - `pytest`
+- `python scripts/run_agent_eval.py`
 - API 主链路测试。
 - Golden Set 小集合。
 - 安全边界测试。

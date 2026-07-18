@@ -32,7 +32,10 @@ app = FastAPI(
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
+FRONTEND_DIST_DIR = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if (FRONTEND_DIST_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST_DIR / "assets"), name="frontend-assets")
 
 
 @app.get("/healthz")
@@ -42,6 +45,9 @@ def healthz() -> dict[str, str]:
 
 @app.get("/", response_class=HTMLResponse)
 def console() -> str:
+    frontend_index = FRONTEND_DIST_DIR / "index.html"
+    if frontend_index.exists():
+        return frontend_index.read_text(encoding="utf-8")
     return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
 
 
@@ -95,6 +101,21 @@ def get_execution(execution_id: str):
 @app.get("/api/v1/playbooks")
 def list_playbooks():
     return service().list_playbooks()
+
+
+@app.post("/api/v1/findings/{finding_id}/agent-runs")
+def create_agent_run(finding_id: str):
+    return service().create_agent_run(finding_id)
+
+
+@app.get("/api/v1/agent-runs")
+def list_agent_runs(finding_id: str | None = None):
+    return service().list_agent_runs(finding_id)
+
+
+@app.get("/api/v1/agent-runs/{run_id}")
+def get_agent_run(run_id: str):
+    return service().get_agent_run(run_id)
 
 
 @app.get("/api/v1/native-signals")

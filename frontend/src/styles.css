@@ -1,0 +1,286 @@
+:root {
+  color: #172033;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f5f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button {
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+button.secondary {
+  background: #475569;
+}
+
+button.ghost {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+button:disabled {
+  background: #94a3b8;
+  cursor: wait;
+}
+
+pre {
+  background: #0f172a;
+  border-radius: 14px;
+  color: #dbeafe;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow: auto;
+  padding: 16px;
+  white-space: pre-wrap;
+}
+
+.hero {
+  align-items: stretch;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.36), transparent 34%),
+    linear-gradient(135deg, #101827 0%, #172554 54%, #111827 100%);
+  color: white;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  padding: 34px 40px;
+}
+
+.hero h1 {
+  font-size: 44px;
+  letter-spacing: -0.04em;
+  margin: 4px 0 12px;
+}
+
+.hero p {
+  color: #cbd5e1;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 860px;
+}
+
+.eyebrow {
+  color: #93c5fd !important;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hero-card {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  padding: 22px;
+}
+
+.hero-card span {
+  color: #dbeafe;
+}
+
+.layout {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(380px, 1fr) minmax(420px, 1.15fr);
+  padding: 24px 32px 40px;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+  padding: 20px;
+}
+
+.panel h2,
+.panel h3,
+.panel h4 {
+  margin-top: 0;
+}
+
+.panel-head {
+  align-items: start;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.panel-head p,
+.meta,
+.empty {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.alert {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  color: #991b1b;
+  grid-column: span 2;
+  padding: 14px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metric {
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 18px;
+}
+
+.metric:last-child {
+  border-right: 0;
+}
+
+.metric span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.metric strong {
+  font-size: 30px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.finding {
+  align-items: start;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #172033;
+  display: grid;
+  gap: 7px;
+  justify-items: start;
+  padding: 14px;
+  text-align: left;
+}
+
+.finding:hover,
+.finding.selected {
+  border-color: #2563eb;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+}
+
+.finding small {
+  color: #64748b;
+}
+
+.badge {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+
+.badge.critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge.high {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.badge.medium,
+.badge.low {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.artifact {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 10px;
+  padding-top: 16px;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.event {
+  border-left: 3px solid #2563eb;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+}
+
+.event small {
+  color: #64748b;
+}
+
+@media (max-width: 960px) {
+  .hero,
+  .layout {
+    grid-template-columns: 1fr;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .span-2,
+  .alert {
+    grid-column: span 1;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric:nth-child(2) {
+    border-right: 0;
+  }
+}

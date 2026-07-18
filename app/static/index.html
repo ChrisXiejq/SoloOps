@@ -209,6 +209,7 @@
           <p>${item.description}</p>
           <p><strong>Recommended action:</strong> ${item.remediation_action}</p>
           <button id="createPlan">Create Plan</button>
+          <button class="secondary" id="explainAgent">Explain with Agent</button>
           <h4>Evidence</h4>
           <pre>${JSON.stringify(item.evidence, null, 2)}</pre>
         `;
@@ -216,6 +217,12 @@
           const plan = await request(`/api/v1/findings/${id}/plans`, {method: "POST"});
           details.innerHTML += `<h4>Plan</h4><pre>${JSON.stringify(plan, null, 2)}</pre>`;
           await loadFindings();
+          await loadAuditEvents();
+        });
+        document.querySelector("#explainAgent").addEventListener("click", async () => {
+          const run = await request(`/api/v1/findings/${id}/agent-runs`, {method: "POST"});
+          details.innerHTML += `<h4>Agent Explanation</h4><pre>${JSON.stringify(run.output, null, 2)}</pre>`;
+          details.innerHTML += `<p class="meta">Trace: ${run.trace_id} · Status: ${run.status} · Safety: ${run.safety_flags.join(", ") || "none"}</p>`;
           await loadAuditEvents();
         });
       }

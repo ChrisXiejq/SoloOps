@@ -11,9 +11,11 @@ from .domain import (
     ScanResult,
     ScanStatus,
     utcnow,
+    AgentRun,
 )
 from fastapi import HTTPException, status
 
+from .agent import AgentEngine
 from .playbooks import AliyunControlledExecutor, AliyunVerifier, DryRunExecutor, PlaybookRegistry, Verifier
 from .providers import CloudProvider, NativeSignalProvider
 from .providers import AliyunNativeSignalProvider, AliyunReadOnlyProvider, MockCloudProvider, MockNativeSignalProvider
@@ -39,6 +41,10 @@ class SoloOpsService:
         self.playbooks = playbooks or PlaybookRegistry()
         self.executor = executor or AliyunControlledExecutor(self.settings)
         self.verifier = verifier or AliyunVerifier(self.settings)
+        self.agent_engine = AgentEngine(
+            self.settings,
+            {playbook.action: playbook for playbook in self.playbooks.list()},
+        )
         self.scan_queue = InProcessScanQueue(self.run_scan_job)
 
     def scan(
@@ -164,6 +170,37 @@ class SoloOpsService:
 
     def list_playbooks(self):
         return self.playbooks.list()
+
+    def create_agent_run(self, finding_id: str) -> AgentRun:
+        finding = self.store.get_finding(finding_id)
+        if not finding:
+            raise HTTPException(status_code=404, detail="Finding not found")
+        run = self.agent_engine.triage_finding(finding)
+        self.store.save_agent_run(run)
+        self._audit(
+            "AgentRunCreated",
+            entity_type="agent_run",
+            entity_id=run.id,
+            message=f"Agent triage completed for finding {finding_id}.",
+            payload={
+                "finding_id": finding_id,
+                "trace_id": run.trace_id,
+                "agent_type": run.agent_type,
+                "model": run.model,
+                "status": run.status.value,
+                "safety_flags": run.safety_flags,
+            },
+        )
+        return run
+
+    def get_agent_run(self, run_id: str) -> AgentRun:
+        run = self.store.get_agent_run(run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Agent run not found")
+        return run
+
+    def list_agent_runs(self, finding_id: str | None = None) -> list[AgentRun]:
+        return self.store.list_agent_runs(finding_id)
 
     def list_native_signals(self, provider_name: str):
         _, signal_provider = self._providers_for(provider_name)

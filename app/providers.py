@@ -46,6 +46,14 @@ class OssBucketSnapshot:
 
 
 @dataclass(frozen=True)
+class ProviderReadError:
+    source: str
+    operation: str
+    resource_id: str | None
+    error: str
+
+
+@dataclass(frozen=True)
 class NativeSignal:
     id: str
     source: str
@@ -184,96 +192,137 @@ class AliyunReadOnlyProvider:
         self._oos_client = None
         self._actiontrail_client = None
         self._rds_client = None
+        self._instances_cache: list[InstanceSnapshot] | None = None
+        self._security_group_rules_cache: list[SecurityGroupRule] | None = None
+        self._rds_instances_cache: list[RdsInstanceSnapshot] | None = None
+        self._oss_buckets_cache: list[OssBucketSnapshot] | None = None
+        self.read_errors: list[ProviderReadError] = []
 
     def list_instances(self) -> list[InstanceSnapshot]:
-        request = self._ecs_models().DescribeInstancesRequest(
-            region_id=self.region,
-            instance_ids=json.dumps([self.instance_id]) if self.instance_id else None,
-            vpc_id=self.settings.aliyun_vpc_id,
-            page_size=10,
-        )
-        response = self._ecs_client_lazy().describe_instances(request)
-        instances = response.body.to_map().get("Instances", {}).get("Instance", []) or []
-        snapshots: list[InstanceSnapshot] = []
-        for instance in instances:
-            instance_id = instance.get("InstanceId")
-            if not instance_id:
-                continue
-            snapshots.append(InstanceSnapshot(
-                instance_id=instance_id,
-                name=instance.get("InstanceName") or instance_id,
-                disk_used_percent=self._latest_cms_metric(instance_id, "diskusage_utilization"),
-                container_restart_count=0,
-            ))
-        return snapshots
+        if self._instances_cache is not None:
+            return self._instances_cache
+        try:
+            request = self._ecs_models().DescribeInstancesRequest(
+                region_id=self.region,
+                instance_ids=json.dumps([self.instance_id]) if self.instance_id else None,
+                vpc_id=self.settings.aliyun_vpc_id,
+                page_size=10,
+            )
+            response = self._ecs_client_lazy().describe_instances(request)
+            instances = response.body.to_map().get("Instances", {}).get("Instance", []) or []
+            snapshots: list[InstanceSnapshot] = []
+            for instance in instances:
+                instance_id = instance.get("InstanceId")
+                if not instance_id:
+                    continue
+                snapshots.append(InstanceSnapshot(
+                    instance_id=instance_id,
+                    name=instance.get("InstanceName") or instance_id,
+                    disk_used_percent=self._latest_cms_metric(instance_id, "diskusage_utilization"),
+                    container_restart_count=0,
+                ))
+            self._instances_cache = snapshots
+        except Exception as exc:
+            self._record_read_error("ecs", "DescribeInstances", self.instance_id, exc)
+            self._instances_cache = []
+        return self._instances_cache
 
     def list_security_group_rules(self) -> list[SecurityGroupRule]:
+        if self._security_group_rules_cache is not None:
+            return self._security_group_rules_cache
         if not self.security_group_id:
             return []
-        request = self._ecs_models().DescribeSecurityGroupAttributeRequest(
-            region_id=self.region,
-            security_group_id=self.security_group_id,
-            direction="all",
-        )
-        response = self._ecs_client_lazy().describe_security_group_attribute(request)
-        permissions = response.body.to_map().get("Permissions", {}).get("Permission", []) or []
-        rules: list[SecurityGroupRule] = []
-        for permission in permissions:
-            rules.append(SecurityGroupRule(
+        try:
+            request = self._ecs_models().DescribeSecurityGroupAttributeRequest(
+                region_id=self.region,
                 security_group_id=self.security_group_id,
-                direction=(permission.get("Direction") or "ingress").lower(),
-                protocol=(permission.get("IpProtocol") or "").lower(),
-                port_range=permission.get("PortRange") or "",
-                source_cidr=permission.get("SourceCidrIp")
-                or permission.get("Ipv6SourceCidrIp")
-                or permission.get("SourceGroupId")
-                or "",
-            ))
-        return rules
+                direction="all",
+            )
+            response = self._ecs_client_lazy().describe_security_group_attribute(request)
+            permissions = response.body.to_map().get("Permissions", {}).get("Permission", []) or []
+            rules: list[SecurityGroupRule] = []
+            for permission in permissions:
+                rules.append(SecurityGroupRule(
+                    security_group_id=self.security_group_id,
+                    direction=(permission.get("Direction") or "ingress").lower(),
+                    protocol=(permission.get("IpProtocol") or "").lower(),
+                    port_range=permission.get("PortRange") or "",
+                    source_cidr=permission.get("SourceCidrIp")
+                    or permission.get("Ipv6SourceCidrIp")
+                    or permission.get("SourceGroupId")
+                    or "",
+                ))
+            self._security_group_rules_cache = rules
+        except Exception as exc:
+            self._record_read_error("ecs", "DescribeSecurityGroupAttribute", self.security_group_id, exc)
+            self._security_group_rules_cache = []
+        return self._security_group_rules_cache
 
     def list_rds_instances(self) -> list[RdsInstanceSnapshot]:
-        request = self._rds_models().DescribeDBInstancesRequest(
-            region_id=self.region,
-            dbinstance_id=self.settings.aliyun_rds_instance_id,
-            vpc_id=self.settings.aliyun_vpc_id,
-            page_size=30,
-        )
-        response = self._rds_client_lazy().describe_dbinstances(request)
-        instances = (
-            response.body.to_map()
-            .get("Items", {})
-            .get("DBInstance", [])
-            or []
-        )
-        snapshots: list[RdsInstanceSnapshot] = []
-        for instance in instances:
-            instance_id = instance.get("DBInstanceId")
-            if not instance_id:
-                continue
-            attrs = self._rds_instance_attributes(instance_id)
-            whitelists = self._rds_whitelist_cidrs(instance_id)
-            snapshots.append(RdsInstanceSnapshot(
-                instance_id=instance_id,
-                engine=str(attrs.get("Engine") or instance.get("Engine") or ""),
-                network_type=str(
-                    attrs.get("InstanceNetworkType")
-                    or instance.get("InstanceNetworkType")
-                    or instance.get("DBInstanceNetType")
-                    or ""
-                ),
-                whitelist_cidrs=whitelists,
-                backup_retention_days=self._int_or_none(
-                    attrs.get("BackupRetentionPeriod") or attrs.get("BackupPolicy")
-                ),
-                storage_used_percent=self._storage_used_percent(attrs),
-            ))
-        return snapshots
+        if self._rds_instances_cache is not None:
+            return self._rds_instances_cache
+        try:
+            request = self._rds_models().DescribeDBInstancesRequest(
+                region_id=self.region,
+                dbinstance_id=self.settings.aliyun_rds_instance_id,
+                vpc_id=self.settings.aliyun_vpc_id,
+                page_size=30,
+            )
+            response = self._rds_client_lazy().describe_dbinstances(request)
+            instances = (
+                response.body.to_map()
+                .get("Items", {})
+                .get("DBInstance", [])
+                or []
+            )
+            snapshots: list[RdsInstanceSnapshot] = []
+            for instance in instances:
+                instance_id = instance.get("DBInstanceId")
+                if not instance_id:
+                    continue
+                attrs = self._rds_instance_attributes(instance_id)
+                whitelists = self._rds_whitelist_cidrs(instance_id)
+                snapshots.append(RdsInstanceSnapshot(
+                    instance_id=instance_id,
+                    engine=str(attrs.get("Engine") or instance.get("Engine") or ""),
+                    network_type=str(
+                        attrs.get("InstanceNetworkType")
+                        or instance.get("InstanceNetworkType")
+                        or instance.get("DBInstanceNetType")
+                        or ""
+                    ),
+                    whitelist_cidrs=whitelists,
+                    backup_retention_days=self._int_or_none(
+                        attrs.get("BackupRetentionPeriod") or attrs.get("BackupPolicy")
+                    ),
+                    storage_used_percent=self._storage_used_percent(attrs),
+                ))
+            self._rds_instances_cache = snapshots
+        except Exception as exc:
+            self._record_read_error("rds", "DescribeDBInstances", self.settings.aliyun_rds_instance_id, exc)
+            self._rds_instances_cache = []
+        return self._rds_instances_cache
 
     def list_oss_buckets(self) -> list[OssBucketSnapshot]:
-        bucket_names = [self.settings.aliyun_oss_bucket] if self.settings.aliyun_oss_bucket else []
-        if not bucket_names:
-            bucket_names = self._list_oss_bucket_names()
-        return [self._oss_bucket_snapshot(name) for name in bucket_names if name]
+        if self._oss_buckets_cache is not None:
+            return self._oss_buckets_cache
+        try:
+            bucket_names = [self.settings.aliyun_oss_bucket] if self.settings.aliyun_oss_bucket else []
+            if not bucket_names:
+                bucket_names = self._list_oss_bucket_names()
+            snapshots: list[OssBucketSnapshot] = []
+            for name in bucket_names:
+                if not name:
+                    continue
+                try:
+                    snapshots.append(self._oss_bucket_snapshot(name))
+                except Exception as exc:
+                    self._record_read_error("oss", "GetBucketConfiguration", name, exc)
+            self._oss_buckets_cache = snapshots
+        except Exception as exc:
+            self._record_read_error("oss", "ListBuckets", None, exc)
+            self._oss_buckets_cache = []
+        return self._oss_buckets_cache
 
     def _latest_cms_metric(self, instance_id: str, metric_name: str) -> float:
         request = self._cms_models().DescribeMetricLastRequest(
@@ -286,7 +335,8 @@ class AliyunReadOnlyProvider:
         try:
             response = self._cms_client_lazy().describe_metric_last(request)
             datapoints = json.loads(response.body.datapoints or "[]")
-        except Exception:
+        except Exception as exc:
+            self._record_read_error("cms", f"DescribeMetricLast:{metric_name}", instance_id, exc)
             return 0.0
         values = [point.get("Maximum") or point.get("Average") or point.get("Value") for point in datapoints]
         numeric_values = [float(value) for value in values if value is not None]
@@ -380,7 +430,8 @@ class AliyunReadOnlyProvider:
         try:
             response = self._rds_client_lazy().describe_dbinstance_attribute(request)
             attrs = response.body.to_map().get("Items", {}).get("DBInstanceAttribute", []) or []
-        except Exception:
+        except Exception as exc:
+            self._record_read_error("rds", "DescribeDBInstanceAttribute", instance_id, exc)
             return {}
         return attrs[0] if attrs else {}
 
@@ -389,7 +440,8 @@ class AliyunReadOnlyProvider:
         try:
             response = self._rds_client_lazy().describe_dbinstance_iparray_list(request)
             arrays = response.body.to_map().get("Items", {}).get("DBInstanceIPArray", []) or []
-        except Exception:
+        except Exception as exc:
+            self._record_read_error("rds", "DescribeDBInstanceIPArrayList", instance_id, exc)
             return []
         cidrs: list[str] = []
         for item in arrays:
@@ -497,6 +549,23 @@ class AliyunReadOnlyProvider:
         except (TypeError, ValueError):
             return None
 
+    def _record_read_error(
+        self,
+        source: str,
+        operation: str,
+        resource_id: str | None,
+        exc: Exception,
+    ) -> None:
+        error = str(exc)
+        item = ProviderReadError(
+            source=source,
+            operation=operation,
+            resource_id=resource_id,
+            error=error,
+        )
+        if item not in self.read_errors:
+            self.read_errors.append(item)
+
 
 class AliyunNativeSignalProvider:
     """Read CloudMonitor-like native signals for the configured ECS instance."""
@@ -506,7 +575,12 @@ class AliyunNativeSignalProvider:
 
     def list_signals(self) -> list[NativeSignal]:
         signals: list[NativeSignal] = []
-        for instance in self.provider.list_instances():
+        instances = self.provider.list_instances()
+        self.provider.list_security_group_rules()
+        self.provider.list_rds_instances()
+        self.provider.list_oss_buckets()
+
+        for instance in instances:
             if instance.disk_used_percent >= 85:
                 signals.append(NativeSignal(
                     id=f"cms-disk-{instance.instance_id}",
@@ -524,9 +598,165 @@ class AliyunNativeSignalProvider:
                         "threshold": 85.0,
                     },
                 ))
+        signals.extend(self._sls_log_pattern_signals(instances))
         signals.extend(self._ecs_health_signals())
         signals.extend(self._oos_execution_signals())
         signals.extend(self._actiontrail_change_signals())
+        signals.extend(self._provider_read_error_signals())
+        return signals
+
+    def _sls_log_pattern_signals(self, instances: list[InstanceSnapshot]) -> list[NativeSignal]:
+        if not self.provider.settings.aliyun_sls_project or not self.provider.settings.aliyun_sls_logstore:
+            return []
+        if not instances and self.provider.instance_id:
+            instances = [InstanceSnapshot(
+                instance_id=self.provider.instance_id,
+                name=self.provider.instance_id,
+                disk_used_percent=0.0,
+                container_restart_count=0,
+            )]
+
+        signals: list[NativeSignal] = []
+        for instance in instances:
+            signals.extend(self._sls_instance_pattern_signals(instance.instance_id))
+        return signals
+
+    def _sls_instance_pattern_signals(self, instance_id: str) -> list[NativeSignal]:
+        signals: list[NativeSignal] = []
+        restart_query = (
+            f'"{instance_id}" and (restart or Restart or CrashLoopBackOff or OOMKilled or "Back-off")'
+        )
+        error_query = (
+            f'"{instance_id}" and (ERROR or Error or Exception or Traceback or panic or failed)'
+        )
+        deploy_query = (
+            f'"{instance_id}" and (deploy or release or rollback or healthcheck or readiness) '
+            "and (failed or error or timeout or unhealthy)"
+        )
+        restart_count = self._sls_query_count(restart_query, instance_id, "container_restart")
+        if restart_count >= 1:
+            signals.append(self._sls_pattern_signal(
+                instance_id=instance_id,
+                pattern="container_restart",
+                count=restart_count,
+                severity="high" if restart_count >= 5 else "medium",
+                title="Container restart pattern detected",
+                summary=f"SLS logs matched {restart_count} container restart indicators.",
+                query=restart_query,
+            ))
+
+        error_count = self._sls_query_count(error_query, instance_id, "error_log")
+        if error_count >= 1:
+            signals.append(self._sls_pattern_signal(
+                instance_id=instance_id,
+                pattern="error_log",
+                count=error_count,
+                severity="high" if error_count >= 20 else "medium",
+                title="Application error log pattern detected",
+                summary=f"SLS logs matched {error_count} error indicators.",
+                query=error_query,
+            ))
+
+        deploy_count = self._sls_query_count(deploy_query, instance_id, "post_deploy_anomaly")
+        if deploy_count >= 1:
+            signals.append(self._sls_pattern_signal(
+                instance_id=instance_id,
+                pattern="post_deploy_anomaly",
+                count=deploy_count,
+                severity="high",
+                title="Post-deploy anomaly pattern detected",
+                summary=f"SLS logs matched {deploy_count} deploy-adjacent anomaly indicators.",
+                query=deploy_query,
+            ))
+        return signals
+
+    def _sls_query_count(self, query: str, resource_id: str, pattern: str) -> int:
+        now = datetime.now(timezone.utc)
+        start = now - timedelta(hours=self.provider.settings.aliyun_signal_lookback_hours)
+        try:
+            from aliyun.log import GetLogsRequest
+
+            request = GetLogsRequest(
+                project=self.provider.settings.aliyun_sls_project,
+                logstore=self.provider.settings.aliyun_sls_logstore,
+                fromTime=int(start.timestamp()),
+                toTime=int(now.timestamp()),
+                query=query,
+                line=100,
+                reverse=True,
+            )
+            response = self._sls_client().get_logs(request)
+            count = getattr(response, "get_count", lambda: 0)()
+            if count:
+                return int(count)
+            logs = getattr(response, "get_logs", lambda: [])()
+            return len(logs or [])
+        except Exception as exc:
+            self.provider._record_read_error("sls", f"GetLogs:{pattern}", resource_id, exc)
+            return 0
+
+    def _sls_pattern_signal(
+        self,
+        *,
+        instance_id: str,
+        pattern: str,
+        count: int,
+        severity: str,
+        title: str,
+        summary: str,
+        query: str,
+    ) -> NativeSignal:
+        now = datetime.now(timezone.utc)
+        return NativeSignal(
+            id=f"sls-{pattern}-{instance_id}-{int(now.timestamp())}",
+            source="sls",
+            signal_type="log_pattern",
+            severity=severity,
+            resource_id=instance_id,
+            title=title,
+            summary=summary,
+            observed_at=now,
+            payload={
+                "project": self.provider.settings.aliyun_sls_project,
+                "logstore": self.provider.settings.aliyun_sls_logstore,
+                "pattern": pattern,
+                "count": count,
+                "restart_count": count if pattern == "container_restart" else 0,
+                "lookback_hours": self.provider.settings.aliyun_signal_lookback_hours,
+                "query": query,
+            },
+        )
+
+    def _sls_client(self):
+        from aliyun.log import LogClient
+
+        if not self.provider.settings.aliyun_access_key_id or not self.provider.settings.aliyun_access_key_secret:
+            raise ValueError("Missing ALIBABA_CLOUD_ACCESS_KEY_ID or ALIBABA_CLOUD_ACCESS_KEY_SECRET")
+        return LogClient(
+            f"{self.provider.region}.log.aliyuncs.com",
+            self.provider.settings.aliyun_access_key_id,
+            self.provider.settings.aliyun_access_key_secret,
+        )
+
+    def _provider_read_error_signals(self) -> list[NativeSignal]:
+        now = datetime.now(timezone.utc)
+        signals: list[NativeSignal] = []
+        for item in self.provider.read_errors:
+            signals.append(NativeSignal(
+                id=f"{item.source}-read-error-{self._stable_id(item.__dict__)}",
+                source=item.source,
+                signal_type="provider_error",
+                severity="medium",
+                resource_id=item.resource_id or next(iter(self._configured_resource_ids()), "account"),
+                title=f"{item.source} read failed",
+                summary=f"Failed to run {item.operation}: {item.error}",
+                observed_at=now,
+                payload={
+                    "operation": item.operation,
+                    "resource_id": item.resource_id,
+                    "error": item.error,
+                },
+            ))
         return signals
 
     def _ecs_health_signals(self) -> list[NativeSignal]:

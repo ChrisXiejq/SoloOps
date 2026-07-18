@@ -23,6 +23,8 @@ class Settings:
     aliyun_security_group_id: str | None = None
     aliyun_rds_instance_id: str | None = None
     aliyun_oss_bucket: str | None = None
+    aliyun_sls_project: str | None = None
+    aliyun_sls_logstore: str | None = None
     aliyun_access_key_id: str | None = None
     aliyun_access_key_secret: str | None = None
     aliyun_actiontrail_endpoint: str = "actiontrail.cn-hangzhou.aliyuncs.com"
@@ -45,6 +47,8 @@ def get_settings() -> Settings:
         aliyun_security_group_id=os.getenv("SOLOOPS_ALIYUN_SECURITY_GROUP_ID"),
         aliyun_rds_instance_id=os.getenv("SOLOOPS_ALIYUN_RDS_INSTANCE_ID"),
         aliyun_oss_bucket=os.getenv("SOLOOPS_ALIYUN_OSS_BUCKET"),
+        aliyun_sls_project=os.getenv("SOLOOPS_ALIYUN_SLS_PROJECT"),
+        aliyun_sls_logstore=os.getenv("SOLOOPS_ALIYUN_SLS_LOGSTORE"),
         aliyun_access_key_id=os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"),
         aliyun_access_key_secret=os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"),
         aliyun_actiontrail_endpoint=os.getenv(

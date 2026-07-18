@@ -20,6 +20,8 @@
 | [11-deployment-runbook.md](11-deployment-runbook.md) | 本地、生产部署、发布检查、回滚和故障处理 |
 | [12-resource-and-cost-plan.md](12-resource-and-cost-plan.md) | Conda 环境、阿里云资源、模型资源和成本规划 |
 | [13-native-cloud-governance-positioning.md](13-native-cloud-governance-positioning.md) | SoloOps 与阿里云 CloudMonitor/ARMS/SLS/OOS 的关系和定位 |
+| [w7-pre-agent-todos.md](w7-pre-agent-todos.md) | W7 前遗留待办 |
+| [w8-deployment-and-demo-plan.md](w8-deployment-and-demo-plan.md) | W8 部署资源、React Console、Demo 和验证清单 |
 
 ## 开发前必须冻结的决策
 
@@ -32,8 +34,8 @@
 
 ## 下一步开发建议
 
-1. 先把当前内存仓库替换为 PostgreSQL Repository。
-2. 增加扫描任务状态和 Worker。
-3. 开发 Web Console 的 Finding 列表和详情页。
-4. 完成审批、审计和 dry run 执行的持久化。
-5. 再接入阿里云只读 Provider。
+1. 补齐真实 RDS、OSS、SLS 配置并做权限预检页面。
+2. 将静态 Web Console 迁移到 React/TypeScript。
+3. 将进程内 Worker 替换为 Redis + RQ/Celery 或云消息队列。
+4. 引入 Alembic 管理数据库迁移。
+5. 扩展 Planner/Reviewer/Verifier/Postmortem Agent，并把 `scripts/run_agent_eval.py` 接入 CI。

@@ -43,6 +43,12 @@ class ExecutionStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class AgentRunStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    FALLBACK = "fallback"
+
+
 class Evidence(BaseModel):
     source: str
     observed_at: datetime = Field(default_factory=utcnow)
@@ -117,6 +123,19 @@ class Execution(BaseModel):
     status: ExecutionStatus = ExecutionStatus.PENDING_APPROVAL
     verification: str | None = None
     audit: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class AgentRun(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    finding_id: str
+    trace_id: str = Field(default_factory=lambda: str(uuid4()))
+    agent_type: str = "triage"
+    model: str
+    input_refs: dict[str, Any] = Field(default_factory=dict)
+    output: dict[str, Any] = Field(default_factory=dict)
+    safety_flags: list[str] = Field(default_factory=list)
+    status: AgentRunStatus = AgentRunStatus.SUCCEEDED
     created_at: datetime = Field(default_factory=utcnow)
 
 

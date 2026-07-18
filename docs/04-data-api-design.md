@@ -87,6 +87,9 @@ erDiagram
 | GET | `/api/v1/audit-events` | 查询审计日志 |
 | GET | `/api/v1/resources` | 查询资源快照 |
 | GET | `/api/v1/playbooks` | 查询白名单 Playbook |
+| POST | `/api/v1/findings/{finding_id}/agent-runs` | 对 Finding 运行 Triage Agent 并保存 Trace |
+| GET | `/api/v1/agent-runs` | 查询 Agent Trace，可按 `finding_id` 过滤 |
+| GET | `/api/v1/agent-runs/{run_id}` | 查询单次 Agent Trace |
 
 ## 6. 请求响应示例
 
@@ -106,7 +109,7 @@ POST /api/v1/scans
 当前实现支持的 `provider`：
 
 - `mock`：本地固定数据，适合测试和演示。
-- `aliyun`：读取 `.env` 中配置的阿里云 ECS、安全组、CloudMonitor 指标和 ECS 健康状态。
+- `aliyun`：读取 `.env` 中配置的阿里云 ECS、安全组、CloudMonitor、ECS 健康、OOS、ActionTrail、RDS、OSS 和 SLS。
 
 响应：
 
@@ -156,6 +159,47 @@ pending -> running -> succeeded / failed
   "remediation_action": "revoke_public_postgres_rule"
 }
 ```
+
+### Agent 解释
+
+```json
+POST /api/v1/findings/finding_01/agent-runs
+```
+
+响应：
+
+```json
+{
+  "id": "agent_run_01",
+  "finding_id": "finding_01",
+  "trace_id": "trace_01",
+  "agent_type": "triage",
+  "model": "qwen-plus",
+  "status": "succeeded",
+  "input_refs": {
+    "evidence_count": 1,
+    "evidence_sources": ["resource_config"]
+  },
+  "output": {
+    "summary": "PostgreSQL is reachable from the public internet.",
+    "impact": "Attackers can attempt brute force or exploit exposed database services.",
+    "confidence": "high",
+    "needs_more_evidence": false,
+    "recommended_playbook": "revoke_public_postgres_rule",
+    "safe_next_steps": [
+      "Review the evidence attached to the finding.",
+      "Require human approval before any real execution."
+    ],
+    "prohibited_actions_checked": [
+      "No shell command was generated.",
+      "No approval bypass was suggested."
+    ]
+  },
+  "safety_flags": []
+}
+```
+
+Agent 输出只解释证据和推荐已登记 Playbook；不创建新动作，不绕过审批，不直接执行云 API。
 
 ### 审批计划
 

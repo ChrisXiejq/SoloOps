@@ -36,18 +36,21 @@
 - W3：已完成最小 Web Console，可触发 Mock 归因、查看 Finding 列表、证据详情和审计事件；正式 React Console 后续补。
 - W4：已完成 Plan 创建、审批门禁、`audit_events` 表、执行未审批拒绝和基础审计流；后续补拒绝审批、筛选、导出和不可变审计策略。
 - W5：已完成 Playbook Registry、三个 dry-run Playbook、dry-run Executor 和 Verifier；真实 OOS/STS 执行 Adapter 后续补。
-- W6：已完成首批真实只读接入：指定 ECS 实例、安全组规则、CloudMonitor 磁盘指标、ECS 健康状态；SLS/OOS/ActionTrail/RDS/OSS 后续补。
+- W6：已完成真实只读接入：指定 ECS 实例、安全组规则、CloudMonitor 磁盘指标、ECS 健康状态、OOS 执行记录、ActionTrail 变更记录、RDS 实例/白名单、OSS bucket 配置和 SLS 日志模式；后续重点是补真实账号配置、权限预检和 provider 错误可视化。
+- W7：已完成 Triage Agent、Qwen/Bailian 适配、确定性 fallback、`agent_runs` Trace、Agent API、控制台解释按钮、Golden Set 和红队安全评测脚本。
+- W8：已启动部署与演示阶段；新增 React/Vite Console、多阶段 Docker 构建和 W8 部署资源清单，详见 `docs/w8-deployment-and-demo-plan.md`。
 
 仍为 Mock/待迁移的边界：
 
 - `MockCloudProvider`：仍保留为本地回归基线；真实 `AliyunReadOnlyProvider` 已支持 ECS 实例和安全组规则读取。
 - `MockNativeSignalProvider`：仍保留为本地回归基线；真实 `AliyunNativeSignalProvider` 已支持 CloudMonitor 磁盘指标和 ECS 健康状态。
-- RDS/OSS：当前未进入规则引擎，后续增加资源快照表和规则后接入。
-- SLS/OOS/ActionTrail：当前未接 SDK，后续分别用于日志模式、执行记录和最近变更归因。
+- RDS/OSS：已进入规则引擎；当前 `.env` 仍需要配置 `SOLOOPS_ALIYUN_RDS_INSTANCE_ID` 和 `SOLOOPS_ALIYUN_OSS_BUCKET` 才能按最小权限扫描指定资源。
+- SLS/OOS/ActionTrail：已接 SDK；SLS 需要配置 `SOLOOPS_ALIYUN_SLS_PROJECT` 和 `SOLOOPS_ALIYUN_SLS_LOGSTORE` 后才能查询真实日志模式。
 - `InProcessScanQueue`：当前适合本地演示，生产可替换为 Redis + RQ/Celery 或云上消息队列。
 - `DryRunExecutor`：当前不改云资源，真实执行需要接入 STS 短时写角色和 OOS 模板 Adapter。
 - `Verifier`：当前为 dry-run 验证，真实验证需要重新读取 CloudMonitor/ECS/SLS/OOS 证据。
-- Web Console：当前是静态 HTML 最小页面，后续可迁移到 React/TypeScript。
+- Web Console：已新增 React/TypeScript/Vite Console；FastAPI 会优先服务 `frontend/dist`，未构建时回退到旧静态 HTML。
+- Agent：当前已支持 Finding 级 Triage Agent；Planner/Reviewer/Verifier/Postmortem Agent 后续按 Playbook 和执行数据继续扩展。
 
 ### v0.1：离线可信 MVP
 

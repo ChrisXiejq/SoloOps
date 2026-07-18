@@ -14,7 +14,7 @@ class Scanner:
         findings: list[Finding] = []
         signals = signal_provider.list_signals() if signal_provider else []
         signals_by_resource = self._group_signals(signals)
-        for rule in provider.list_security_group_rules():
+        for rule in self._safe_list(provider.list_security_group_rules):
             if (
                 rule.direction == "ingress"
                 and rule.protocol.lower() == "tcp"
@@ -41,7 +41,7 @@ class Scanner:
                     rollback_action="restore_exact_security_group_rule",
                 ))
 
-        for instance in provider.list_instances():
+        for instance in self._safe_list(provider.list_instances):
             if instance.disk_used_percent >= 85:
                 signal_evidence = self._evidence_for_resource(
                     signals_by_resource.get(instance.instance_id, []),
@@ -62,7 +62,11 @@ class Scanner:
                     remediation_action="collect_disk_diagnosis",
                     rollback_action=None,
                 ))
-            if instance.container_restart_count >= 5:
+            restart_count = max(
+                instance.container_restart_count,
+                self._restart_count_from_signals(signals_by_resource.get(instance.instance_id, [])),
+            )
+            if restart_count >= 5:
                 signal_evidence = self._evidence_for_resource(
                     signals_by_resource.get(instance.instance_id, []),
                     signal_types={"log_pattern", "change_event", "execution_record", "provider_error"},
@@ -70,20 +74,20 @@ class Scanner:
                 findings.append(Finding(
                     rule_id="ECS-002", title="Container restart loop suspected", severity=Severity.HIGH,
                     resource_id=instance.instance_id,
-                    description=f"Observed {instance.container_restart_count} restarts.",
+                    description=f"Observed {restart_count} restarts.",
                     evidence=[
                         *signal_evidence,
                         Evidence(
                             source="resource_snapshot",
                             summary="Instance snapshot confirms restart threshold exceeded",
-                            payload=instance.__dict__,
+                            payload=instance.__dict__ | {"effective_restart_count": restart_count},
                         ),
                     ],
                     remediation_action="collect_container_diagnosis",
                     rollback_action=None,
                 ))
 
-        for rds in provider.list_rds_instances():
+        for rds in self._safe_list(provider.list_rds_instances):
             signal_evidence = self._evidence_for_resource(
                 signals_by_resource.get(rds.instance_id, []),
                 signal_types={"change_event", "execution_record", "provider_error"},
@@ -148,7 +152,7 @@ class Scanner:
                     rollback_action=None,
                 ))
 
-        for bucket in provider.list_oss_buckets():
+        for bucket in self._safe_list(provider.list_oss_buckets):
             signal_evidence = self._evidence_for_resource(
                 signals_by_resource.get(bucket.bucket_name, []),
                 signal_types={"change_event", "execution_record", "provider_error"},
@@ -192,6 +196,13 @@ class Scanner:
         return ScanResult(provider=provider_name, findings=findings)
 
     @staticmethod
+    def _safe_list(getter):
+        try:
+            return getter()
+        except Exception:
+            return []
+
+    @staticmethod
     def _group_signals(signals: list[NativeSignal]) -> dict[str, list[NativeSignal]]:
         grouped: dict[str, list[NativeSignal]] = {}
         for signal in signals:
@@ -216,3 +227,18 @@ class Scanner:
             for signal in signals
             if signal.signal_type in signal_types
         ]
+
+    @staticmethod
+    def _restart_count_from_signals(signals: list[NativeSignal]) -> int:
+        counts: list[int] = []
+        for signal in signals:
+            if signal.signal_type != "log_pattern":
+                continue
+            if signal.payload.get("pattern") != "container_restart":
+                continue
+            value = signal.payload.get("restart_count") or signal.payload.get("count")
+            try:
+                counts.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        return max(counts) if counts else 0

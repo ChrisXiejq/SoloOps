@@ -6,3 +6,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 coverage.xml
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo

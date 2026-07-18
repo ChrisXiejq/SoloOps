@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from .db import (
+    AgentRunRecord,
     ApprovalRecord,
     AuditEventRecord,
     ExecutionRecord,
@@ -14,7 +15,7 @@ from .db import (
     ScanRecord,
     create_session_factory,
 )
-from .domain import Approval, AuditEvent, Execution, Finding, RemediationPlan, ScanResult
+from .domain import AgentRun, Approval, AuditEvent, Execution, Finding, RemediationPlan, ScanResult
 
 
 class Store(Protocol):
@@ -48,6 +49,12 @@ class Store(Protocol):
 
     def list_audit_events(self) -> list[AuditEvent]: ...
 
+    def save_agent_run(self, run: AgentRun) -> None: ...
+
+    def get_agent_run(self, run_id: str) -> AgentRun | None: ...
+
+    def list_agent_runs(self, finding_id: str | None = None) -> list[AgentRun]: ...
+
     def clear(self) -> None: ...
 
 
@@ -61,6 +68,7 @@ class MemoryStore:
         self.approvals: dict[str, Approval] = {}
         self.executions: dict[str, Execution] = {}
         self.audit_events: dict[str, AuditEvent] = {}
+        self.agent_runs: dict[str, AgentRun] = {}
 
     def save_scan(self, scan: ScanResult) -> None:
         self.scans[scan.id] = scan
@@ -108,6 +116,18 @@ class MemoryStore:
     def list_audit_events(self) -> list[AuditEvent]:
         return sorted(self.audit_events.values(), key=lambda event: event.created_at, reverse=True)
 
+    def save_agent_run(self, run: AgentRun) -> None:
+        self.agent_runs[run.id] = run
+
+    def get_agent_run(self, run_id: str) -> AgentRun | None:
+        return self.agent_runs.get(run_id)
+
+    def list_agent_runs(self, finding_id: str | None = None) -> list[AgentRun]:
+        runs = list(self.agent_runs.values())
+        if finding_id:
+            runs = [run for run in runs if run.finding_id == finding_id]
+        return sorted(runs, key=lambda run: run.created_at, reverse=True)
+
     def clear(self) -> None:
         self.scans.clear()
         self.findings.clear()
@@ -115,6 +135,7 @@ class MemoryStore:
         self.approvals.clear()
         self.executions.clear()
         self.audit_events.clear()
+        self.agent_runs.clear()
 
 
 class SQLAlchemyStore:
@@ -259,9 +280,38 @@ class SQLAlchemyStore:
             records = session.scalars(select(AuditEventRecord).order_by(AuditEventRecord.created_at.desc())).all()
             return [self._record_to_audit_event(record) for record in records]
 
+    def save_agent_run(self, run: AgentRun) -> None:
+        with self.session_factory.begin() as session:
+            session.merge(AgentRunRecord(
+                id=run.id,
+                finding_id=run.finding_id,
+                trace_id=run.trace_id,
+                agent_type=run.agent_type,
+                model=run.model,
+                input_refs=run.input_refs,
+                output=run.output,
+                safety_flags=run.safety_flags,
+                status=run.status.value,
+                created_at=run.created_at,
+            ))
+
+    def get_agent_run(self, run_id: str) -> AgentRun | None:
+        with self.session_factory() as session:
+            record = session.get(AgentRunRecord, run_id)
+            return self._record_to_agent_run(record) if record else None
+
+    def list_agent_runs(self, finding_id: str | None = None) -> list[AgentRun]:
+        with self.session_factory() as session:
+            stmt = select(AgentRunRecord)
+            if finding_id:
+                stmt = stmt.where(AgentRunRecord.finding_id == finding_id)
+            records = session.scalars(stmt.order_by(AgentRunRecord.created_at.desc())).all()
+            return [self._record_to_agent_run(record) for record in records]
+
     def clear(self) -> None:
         with self.session_factory.begin() as session:
             for record in (
+                AgentRunRecord,
                 AuditEventRecord,
                 ExecutionRecord,
                 ApprovalRecord,
@@ -329,5 +379,20 @@ class SQLAlchemyStore:
             entity_id=record.entity_id,
             message=record.message,
             payload=record.payload,
+            created_at=record.created_at,
+        )
+
+    @staticmethod
+    def _record_to_agent_run(record: AgentRunRecord) -> AgentRun:
+        return AgentRun(
+            id=record.id,
+            finding_id=record.finding_id,
+            trace_id=record.trace_id,
+            agent_type=record.agent_type,
+            model=record.model,
+            input_refs=record.input_refs,
+            output=record.output,
+            safety_flags=record.safety_flags,
+            status=record.status,
             created_at=record.created_at,
         )
