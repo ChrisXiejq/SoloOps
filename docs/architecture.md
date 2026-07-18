@@ -18,7 +18,7 @@ flowchart LR
 
 ## 数据演进
 
-当前代码使用内存仓库以保证快速本地演示。下一步将 `MemoryStore` 替换为 PostgreSQL repository：
+当前代码使用 SQLAlchemy Repository，持久化存储统一使用 MySQL：
 
 - `resources`：资源快照与标签。
 - `observations`：指标/配置证据，按时间分区。
@@ -26,7 +26,7 @@ flowchart LR
 - `remediation_plans`、`approvals`、`executions`：不可变审计链。
 - `agent_runs`：模型、Prompt、工具调用、成本和 Trace。
 
-原始日志放 OSS；关系数据和元数据放 RDS PostgreSQL；短期队列/锁/缓存放 Tair。ECS 只部署 API/worker/代理，避免把数据库或唯一备份留在本机磁盘。
+原始日志放 OSS；关系数据和元数据放 MySQL/RDS MySQL；短期队列/锁/缓存放 Tair。ECS 只部署 API/worker/代理，避免把数据库或唯一备份留在本机磁盘。
 
 ## 三阶段计划
 
@@ -38,7 +38,7 @@ flowchart LR
 
 ### Phase 2：受控变更（2–3 周）
 
-- PostgreSQL + Redis 持久化；登录/RBAC；审批 UI。
+- MySQL + Redis 持久化；登录/RBAC；审批 UI。
 - STS 读/写角色，短时会话策略；操作审计。
 - 两个真正可执行且可回滚的 Playbook：撤销指定风险安全组规则、触发/验证备份。
 
@@ -51,4 +51,4 @@ flowchart LR
 ## 部署
 
 本地：`docker compose up --build`。  
-线上：ECS 部署 API/Worker，RDS PostgreSQL、Tair、OSS 均使用私网；ACR 承载镜像；SLS/OTel 记录观测数据。安全组只开 80/443 和受限 SSH，RDS/Tair 无公网地址。
+线上：ECS 或宝塔部署 API/Worker，MySQL/RDS MySQL、Tair、OSS 优先使用私网；ACR 承载镜像；SLS/OTel 记录观测数据。安全组只开 80/443 和受限 SSH，生产数据库不建议开放公网。

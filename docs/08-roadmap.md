@@ -11,7 +11,7 @@
 
 | 周次 | 交付物 | 退出条件 |
 | --- | --- | --- |
-| W1 | 项目结构升级、PostgreSQL、Repository、迁移脚本 | 当前内存数据迁移到数据库；测试通过 |
+| W1 | 项目结构升级、MySQL/SQLAlchemy Repository、迁移脚本 | 当前内存数据迁移到数据库；测试通过 |
 | W2 | Scan Job、Worker、资源快照、规则引擎扩展 | 扫描异步化；SG/ECS 规则可回归 |
 | W3 | Web Console 基础版：Finding 列表和详情 | 能从页面触发扫描并查看证据 |
 | W4 | Remediation Plan、审批流、审计事件 | 未审批执行被拒绝；审批记录可查询 |
@@ -31,7 +31,7 @@
 
 当前实现进度：
 
-- W1：已完成 SQLAlchemy Repository、本地 SQLite、数据库初始化脚本。
+- W1：已完成 SQLAlchemy Repository、MySQL 存储、数据库初始化脚本。
 - W2：已完成 Mock 原生信号归因、Scan 任务状态机、进程内后台 Worker/队列、Scan/Finding/Plan 查询接口；Redis/Celery/RQ 后续按部署需要替换。
 - W3：已完成最小 Web Console，可触发 Mock 归因、查看 Finding 列表、证据详情和审计事件；正式 React Console 后续补。
 - W4：已完成 Plan 创建、审批门禁、`audit_events` 表、执行未审批拒绝和基础审计流；后续补拒绝审批、筛选、导出和不可变审计策略。
@@ -61,7 +61,7 @@
 
 ### v0.2：持久化和控制台
 
-- PostgreSQL Repository。
+- MySQL/SQLAlchemy Repository。
 - Web Console。
 - 审计日志。
 - 状态筛选和详情页。

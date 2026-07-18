@@ -5,7 +5,7 @@
 首期生产形态采用单 ECS + 托管数据服务：
 
 - ECS：运行 Web、API、Worker、反向代理。
-- RDS PostgreSQL：业务数据、审计、Trace 元数据。
+- MySQL/Baota MySQL/RDS MySQL：业务数据、审计、Trace 元数据。
 - Redis/Tair：队列、锁、缓存和幂等。
 - OSS：诊断包、导出报告、脱敏日志引用。
 - RAM/STS：只读读取原生信号/资源配置和审批后短时写权限。
@@ -74,7 +74,7 @@ uvicorn app.api:app --reload
 | --- | --- | --- |
 | `SOLOOPS_ENV` | `local / staging / production` | `local` |
 | `SOLOOPS_EXECUTION_ENABLED` | 是否允许真实执行 | `false` |
-| `DATABASE_URL` | PostgreSQL 连接串 | 本地默认 |
+| `SOLOOPS_DATABASE_URL` | MySQL 连接串 | 无默认值，必须配置 |
 | `REDIS_URL` | Redis 连接串 | 本地默认 |
 | `OSS_BUCKET` | 诊断包 Bucket | 空 |
 | `ALIYUN_REGION` | 默认地域 | 空 |
@@ -89,13 +89,13 @@ uvicorn app.api:app --reload
 ### 4.1 网络
 
 - 创建 VPC 和交换机。
-- ECS、RDS、Tair 放在同一 VPC。
-- RDS/Tair 不开公网地址。
+- ECS、MySQL、Tair 放在同一 VPC 或同一宝塔服务器内网。
+- MySQL/Tair 生产环境不建议开放公网；本地联调时只给你的固定出口 IP 放行。
 - 安全组只开放 80/443 到反向代理；SSH 仅限个人固定 IP 或堡垒机。
 
 ### 4.2 数据服务
 
-- RDS PostgreSQL：开启自动备份。
+- MySQL：开启自动备份，字符集使用 `utf8mb4`。
 - Tair/Redis：仅允许 ECS 安全组访问。
 - OSS：私有 Bucket，禁止公共读写。
 
@@ -146,7 +146,7 @@ curl https://<domain>/healthz
 - [ ] 单元和集成测试通过。
 - [ ] `python scripts/run_agent_eval.py` 通过。
 - [ ] 数据库迁移完成。
-- [ ] RDS 自动备份开启。
+- [ ] MySQL 自动备份开启。
 - [ ] Redis/Tair 私网访问。
 - [ ] OSS Bucket 私有。
 - [ ] 应用未保存主账号 AccessKey。
@@ -167,7 +167,7 @@ curl https://<domain>/healthz
 
 ### 数据库回滚
 
-- 每次迁移前创建快照或确认 RDS 备份。
+- 每次迁移前创建快照或确认 MySQL 备份。
 - 可逆迁移提供 down 脚本。
 - 不可逆迁移必须在 PR 中说明风险和恢复方式。
 
@@ -188,7 +188,7 @@ curl https://<domain>/healthz
 - 执行失败率。
 - 数据库连接数和慢查询。
 - Redis 队列积压。
-- RDS 存储空间。
+- MySQL 存储空间。
 - ECS CPU、内存、磁盘。
 - 审批后真实执行次数。
 
@@ -230,7 +230,7 @@ curl https://<domain>/healthz
 
 每月至少演练一次：
 
-1. 从 RDS 备份恢复到临时实例。
+1. 从 MySQL 备份恢复到临时实例。
 2. 使用临时配置启动 SoloOps。
 3. 验证审计日志和 Finding 可查询。
 4. 记录恢复耗时和问题。

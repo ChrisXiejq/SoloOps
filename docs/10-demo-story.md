@@ -15,7 +15,7 @@
 假设有一个独立开发者运行了一个线上应用：
 
 - Web 服务跑在 ECS 上。
-- 数据库使用 PostgreSQL/RDS。
+- 数据库使用 MySQL/宝塔 MySQL/RDS MySQL。
 - 应用通过 Docker Compose 部署。
 - 最近 CloudMonitor 出现磁盘告警，SLS 里出现容器重启日志。
 - 安全组错误地把 PostgreSQL 暴露到公网。
@@ -197,4 +197,4 @@ docker compose up --build
 
 可写为：
 
-> SoloOps：面向独立开发者和小团队的 AI 运维治理层。基于 FastAPI、PostgreSQL、Redis、Docker 和阿里云 RAM/STS 设计，聚合 CloudMonitor、ECS 健康、SLS、OOS 等原生信号，将告警转化为证据化 Finding、受控 Playbook/OOS 模板、人工审批、dry-run 执行、审计追踪和 Agent 风险解释。项目强调最小权限、状态机、可观测性、评测体系和 LLM 安全边界。
+> SoloOps：面向独立开发者和小团队的 AI 运维治理层。基于 FastAPI、MySQL、Redis、Docker 和阿里云 RAM/STS 设计，聚合 CloudMonitor、ECS 健康、SLS、OOS 等原生信号，将告警转化为证据化 Finding、受控 Playbook/OOS 模板、人工审批、dry-run 执行、审计追踪和 Agent 风险解释。项目强调最小权限、状态机、可观测性、评测体系和 LLM 安全边界。

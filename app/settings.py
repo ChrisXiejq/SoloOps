@@ -10,7 +10,7 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class Settings:
-    database_url: str = "sqlite:///./.soloops/soloops.db"
+    database_url: str = ""
     store_backend: str = "sqlalchemy"
     execution_enabled: bool = False
     model_provider: str = "mock"
@@ -34,7 +34,7 @@ class Settings:
 
 def get_settings() -> Settings:
     return Settings(
-        database_url=os.getenv("SOLOOPS_DATABASE_URL", "sqlite:///./.soloops/soloops.db"),
+        database_url=os.getenv("SOLOOPS_DATABASE_URL", ""),
         store_backend=os.getenv("SOLOOPS_STORE_BACKEND", "sqlalchemy"),
         execution_enabled=os.getenv("SOLOOPS_EXECUTION_ENABLED", "false").lower() == "true",
         model_provider=os.getenv("SOLOOPS_MODEL_PROVIDER", "mock"),

@@ -15,7 +15,7 @@
 | UI | Tailwind CSS + shadcn/ui | 快速构建企业级控制台 |
 | 后端 API | FastAPI + Pydantic | 与当前代码一致，OpenAPI 友好 |
 | 异步任务 | Celery/RQ + Redis | 扫描、执行、验证、Agent 任务 |
-| 数据库 | PostgreSQL | 核心业务、审计和状态 |
+| 数据库 | MySQL 5.7+/8.0 | 核心业务、审计和状态 |
 | 缓存/队列 | Redis / Tair | 任务队列、锁、短期缓存 |
 | 对象存储 | MinIO / OSS | 诊断包、导出报告、脱敏日志引用 |
 | 云 Provider | 阿里云 Python SDK | ECS、CMS、RDS、OSS、RAM/STS |
@@ -36,7 +36,7 @@
 - 对异步接口和依赖注入支持较好。
 - Python 生态适合云 SDK、Agent 和数据处理。
 
-### PostgreSQL
+### MySQL
 
 替代当前 `MemoryStore`，用于：
 
@@ -109,7 +109,7 @@ MVP：
 Python 3.11+
 Node.js 20+
 Docker Desktop
-PostgreSQL 15+
+MySQL 5.7.8+ 或 8.0
 Redis 7+
 MinIO
 ```

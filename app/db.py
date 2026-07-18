@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, String, create_engine, inspect, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -31,7 +31,7 @@ class FindingRecord(Base):
     rule_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     severity: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
-    resource_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    resource_id: Mapped[str] = mapped_column(String(191), nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(1000), nullable=False)
     evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
     remediation_action: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -105,20 +105,29 @@ class AgentRunRecord(Base):
 
 
 def normalize_database_url(database_url: str) -> str:
-    if database_url.startswith("postgresql://"):
-        return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if database_url.startswith("mysql://"):
+        return database_url.replace("mysql://", "mysql+pymysql://", 1)
     return database_url
 
 
-def create_session_factory(database_url: str) -> sessionmaker:
+def validate_mysql_database_url(database_url: str) -> str:
     normalized = normalize_database_url(database_url)
-    if normalized.startswith("sqlite:///"):
-        db_path = normalized.removeprefix("sqlite:///")
-        if db_path != ":memory:":
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    if not normalized.startswith("mysql+pymysql://"):
+        raise ValueError("SoloOps storage is MySQL-only. Use mysql+pymysql://user:password@host:3306/db?charset=utf8mb4")
+    return normalized
 
-    connect_args = {"check_same_thread": False} if normalized.startswith("sqlite") else {}
-    engine = create_engine(normalized, connect_args=connect_args)
+
+def redact_database_url(database_url: str) -> str:
+    url = make_url(normalize_database_url(database_url))
+    if url.password is None:
+        return str(url)
+    return str(url.set(password="***"))
+
+
+def create_session_factory(database_url: str) -> sessionmaker:
+    normalized = validate_mysql_database_url(database_url)
+    engine_kwargs: dict[str, Any] = {"pool_pre_ping": True, "pool_recycle": 1800}
+    engine = create_engine(normalized, **engine_kwargs)
     Base.metadata.create_all(engine)
     _apply_lightweight_migrations(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)

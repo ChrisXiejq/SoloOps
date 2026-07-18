@@ -41,9 +41,9 @@ conda activate soloops
 | 资源 | 是否必须 | 建议 | 成本 |
 | --- | --- | --- | --- |
 | Python/Conda | 必须 | Python 3.11 + conda env | 0 |
-| Docker Desktop | 必须 | 本地跑 API、PostgreSQL、Redis、MinIO | 0 |
+| Docker Desktop | 必须 | 本地跑 API、MySQL、Redis、MinIO | 0 |
 | Node.js/npm | 必须 | React/Vite Console 开发和构建，建议 Node 20 LTS | 0 |
-| PostgreSQL | 必须 | 本地容器，后续替换 RDS | 0 |
+| MySQL | 必须 | 宝塔 MySQL、Docker MySQL 或 RDS MySQL | 0 到低 |
 | Redis | 必须 | 本地容器，后续替换 Tair | 0 |
 | MinIO | 可选 | 本地模拟 OSS | 0 |
 | Mock Provider | 必须 | 无云账号也能演示主链路 | 0 |
@@ -57,7 +57,7 @@ conda activate soloops
 | 资源 | 阿里云产品 | 必要性 | 建议规格 | 预算建议 |
 | --- | --- | --- | --- | --- |
 | 云服务器 | ECS | 必须 | 2 vCPU / 2-4 GiB，按量或轻量级包年包月 | 低到中 |
-| 数据库 | RDS PostgreSQL | 推荐 | 基础版或 Serverless，1C/2G 起步 | 中 |
+| 数据库 | 宝塔 MySQL / RDS MySQL | 推荐 | MySQL 5.7.8+ 或 8.0，开启 utf8mb4 和自动备份 | 低到中 |
 | 缓存/队列 | Tair/Redis | 可选 | 先用 ECS 内 Docker Redis；准生产再买 Tair 1GB | 0 到中 |
 | 对象存储 | OSS | 推荐 | 私有 Bucket，少量诊断包和导出报告 | 很低 |
 | 日志服务 | SLS | 推荐 | 小规格日志 Project，短保留周期 7-15 天 | 低 |
@@ -69,13 +69,13 @@ conda activate soloops
 | HTTPS 证书 | 数字证书管理服务 | 推荐 | 免费 DV 证书或 Let's Encrypt | 0 到低 |
 | 云监控 | CloudMonitor | 必须开通 | 读取 ECS/RDS 指标 | 通常低 |
 | 权限 | RAM/STS | 必须 | 读角色、写角色、部署角色 | 0 |
-| 专有网络 | VPC/安全组 | 必须 | ECS/RDS/Tair 同 VPC，RDS 不开公网 | 0 |
+| 专有网络 | VPC/安全组 | 必须 | ECS/MySQL/Tair 同 VPC；生产数据库不建议开公网 | 0 |
 
 推荐组合：
 
-1. **最省钱演示**：ECS + Docker PostgreSQL + Docker Redis + OSS + SLS。适合前期录屏和面试展示，但企业级说服力略弱。
-2. **平衡推荐**：ECS + RDS PostgreSQL + Docker Redis + OSS + SLS。数据库托管，成本可控，是秋招项目最合适的档位。
-3. **准生产**：ECS + RDS PostgreSQL + Tair + OSS + SLS + ACR。架构更完整，月成本更高，适合上线长期运行。
+1. **最省钱演示**：ECS/宝塔 + 宝塔 MySQL + Docker Redis + OSS + SLS。适合前期录屏和面试展示。
+2. **平衡推荐**：ECS + RDS MySQL + Docker Redis + OSS + SLS。数据库托管，成本可控，是秋招项目合适档位。
+3. **准生产**：ECS + RDS MySQL + Tair + OSS + SLS + ACR。架构更完整，月成本更高，适合上线长期运行。
 
 ## 5. 阿里云账号内需要申请/配置的资源
 
@@ -94,7 +94,7 @@ conda activate soloops
 
 ### 5.2 推荐配置
 
-- RDS PostgreSQL：保存资源快照、Finding、审批、审计。
+- MySQL：保存资源快照、Finding、审批、审计。
 - OSS 私有 Bucket：保存诊断包、导出报告、脱敏日志引用。
 - SLS Project：收集应用日志、执行日志和告警；SoloOps 只读取脱敏摘要。
 - OOS：登记可被 SoloOps 调用的低风险模板。
@@ -155,7 +155,7 @@ conda activate soloops
 
 | 能力 | 建议依赖 |
 | --- | --- |
-| PostgreSQL | `sqlalchemy`, `alembic`, `psycopg[binary]` |
+| MySQL | `sqlalchemy`, `pymysql` |
 | Redis/队列 | `redis`, `rq` 或 `celery` |
 | 对象存储 OSS | `oss2` 或阿里云新版 SDK |
 | 配置 | `pydantic-settings` |
@@ -165,10 +165,10 @@ conda activate soloops
 
 ## 8. 建议采购顺序
 
-1. 暂不购买云资源，先完成本地 Docker Compose、PostgreSQL Repository 和 Web Console。
+1. 暂不购买云资源，先完成本地/宝塔 MySQL Repository 和 Web Console。
 2. 开通阿里云百炼 API，但设置低预算，先接 MockLLM。
 3. 购买或使用已有 ECS，部署 API/Web/Worker。
-4. 购买 RDS PostgreSQL 小规格，把数据库迁出 ECS。
+4. 需要托管数据库时购买 RDS MySQL 小规格，把数据库迁出 ECS/宝塔本机。
 5. 开通 OSS 和 SLS，完善审计与诊断包。
 6. 真实接入阿里云原生信号 Provider：CloudMonitor、ECS 健康、安全组、OOS 执行记录。
 7. 用 ActionTrail 补齐最近变更归因。
@@ -181,7 +181,7 @@ W8 的资源目标是完成可访问 Demo，而不是搭建复杂生产平台。
 1. 本地安装 Node.js 20 LTS，完成 `frontend` React Console 构建。
 2. 使用 Docker 多阶段构建验证 API + React Console 一体镜像。
 3. 使用已有 ECS 部署镜像，先开放 8000 做调试；演示前再加 Nginx 和 HTTPS。
-4. 如果要体现企业级持久化，购买或复用小规格 RDS PostgreSQL。
+4. 如果要体现企业级持久化，购买或复用小规格 RDS MySQL，或使用宝塔 MySQL 做演示。
 5. 如果要体现真实云原生信号，补齐 OSS Bucket、SLS Project/Logstore、RDS 实例 ID。
 6. 暂缓 ACK、ALB/WAF、高规格 Tair、高规格 RDS。
 

@@ -13,10 +13,11 @@ from app.api import app, service
 
 
 def reset_store() -> None:
+    service.cache_clear()
+    os.environ["SOLOOPS_STORE_BACKEND"] = "memory"
     os.environ["SOLOOPS_MODEL_PROVIDER"] = "mock"
     os.environ["SOLOOPS_MODEL_NAME"] = "deterministic-agent"
     service().store.clear()
-    service.cache_clear()
 
 
 def wait_for_scan(client: TestClient, scan_id: str) -> dict:

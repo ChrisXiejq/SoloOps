@@ -77,11 +77,11 @@ Executor 必须按顺序校验：
 
 | 数据 | 存储策略 |
 | --- | --- |
-| 云资源元数据 | PostgreSQL，按租户隔离 |
-| 指标和配置证据 | PostgreSQL 摘要，必要时对象存储引用 |
+| 云资源元数据 | MySQL，按租户隔离 |
+| 指标和配置证据 | MySQL 摘要，必要时对象存储引用 |
 | 原始日志片段 | 默认不存；如保存，脱敏后进私有 OSS |
 | STS Token | 只在内存使用，不落库 |
-| 审批和审计 | PostgreSQL，不物理删除 |
+| 审批和审计 | MySQL，不物理删除 |
 | Trace | 保存摘要、模型、工具和成本，不保存密钥 |
 
 敏感字段黑名单：`access_key`、`secret`、`token`、`password`、`authorization`、`cookie`、`private_key`。

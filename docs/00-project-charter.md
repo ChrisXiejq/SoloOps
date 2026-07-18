@@ -67,7 +67,7 @@ SoloOps 的定位是在阿里云原生运维生态之上提供一个可信治理
 
 SoloOps 适合作为企业级后端/AI 工程项目展示，重点讲清：
 
-- 云原生系统设计：API、Worker、PostgreSQL、Redis、OSS、Docker、OpenAPI。
+- 云原生系统设计：API、Worker、MySQL、Redis、OSS、Docker、OpenAPI。
 - Agent 工程化：结构化工具、状态机、Trace、评测、成本和失败兜底。
 - 安全工程：RAM/STS、最小权限、审批、审计、白名单执行。
 - 可观测性：请求链路、任务状态、Finding 证据、执行验证。

@@ -7,3 +7,4 @@ dependencies:
   - nodejs>=20,<21
   - pip:
       - -e ".[dev,aliyun]"
+      - pymysql>=1.1,<2.0

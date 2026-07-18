@@ -59,7 +59,7 @@ class Store(Protocol):
 
 
 class MemoryStore:
-    """MVP repository. Replace with PostgreSQL repository behind the same port."""
+    """MVP repository. Replace with SQLAlchemy/MySQL repository behind the same port."""
 
     def __init__(self) -> None:
         self.scans: dict[str, ScanResult] = {}
@@ -141,8 +141,8 @@ class MemoryStore:
 class SQLAlchemyStore:
     """Repository backed by SQLAlchemy.
 
-    Use PostgreSQL in production via SOLOOPS_DATABASE_URL. SQLite is supported
-    for local development and tests.
+    Use MySQL via SOLOOPS_DATABASE_URL. Tests can use MemoryStore by setting
+    SOLOOPS_STORE_BACKEND=memory.
     """
 
     def __init__(self, database_url: str) -> None:

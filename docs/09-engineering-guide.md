@@ -67,7 +67,7 @@ docs(architecture): add deployment topology
 覆盖：
 
 - API 主链路。
-- PostgreSQL Repository。
+- MySQL/SQLAlchemy Repository。
 - Worker Job。
 - Mock Provider。
 - Dry run Executor。

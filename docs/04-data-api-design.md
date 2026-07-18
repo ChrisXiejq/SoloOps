@@ -264,4 +264,4 @@ Idempotency-Key: exec-plan-01-20260716
 | `app/scanner.py` | 演进为 Scanner + Rule Engine |
 | `app/providers.py` | 拆分为 Provider port、Mock adapter、Aliyun adapter |
 | `app/service.py` | 拆分为 ScanService、PlanService、ApprovalService、ExecutionService |
-| `app/store.py` | 替换为 PostgreSQL Repository |
+| `app/store.py` | 使用 SQLAlchemy Repository，生产连接 MySQL |

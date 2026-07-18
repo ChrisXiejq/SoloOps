@@ -22,6 +22,7 @@
 | [13-native-cloud-governance-positioning.md](13-native-cloud-governance-positioning.md) | SoloOps 与阿里云 CloudMonitor/ARMS/SLS/OOS 的关系和定位 |
 | [w7-pre-agent-todos.md](w7-pre-agent-todos.md) | W7 前遗留待办 |
 | [w8-deployment-and-demo-plan.md](w8-deployment-and-demo-plan.md) | W8 部署资源、React Console、Demo 和验证清单 |
+| [baota-mysql-deployment.md](baota-mysql-deployment.md) | 宝塔 MySQL 数据库配置、建表和部署说明 |
 
 ## 开发前必须冻结的决策
 
